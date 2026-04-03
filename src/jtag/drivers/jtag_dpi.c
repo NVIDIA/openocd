@@ -230,27 +230,27 @@ static int jtag_dpi_execute_queue(void)
 	for (cmd = jtag_command_queue; ret == ERROR_OK && cmd;
 	     cmd = cmd->next) {
 		switch (cmd->type) {
-		case JTAG_RUNTEST:
+		case JTAG_CMD_RUNTEST:
 			ret = jtag_dpi_runtest(cmd->cmd.runtest->num_cycles);
 			break;
-		case JTAG_STABLECLOCKS:
+		case JTAG_CMD_STABLECLOCKS:
 			ret = jtag_dpi_stableclocks(cmd->cmd.stableclocks->num_cycles);
 			break;
-		case JTAG_TLR_RESET:
+		case JTAG_CMD_TLR_RESET:
 			/* Enter Test-Logic-Reset state by asserting TRST */
 			if (cmd->cmd.statemove->end_state == TAP_RESET)
 				jtag_dpi_reset(1, 0);
 			break;
-		case JTAG_PATHMOVE:
+		case JTAG_CMD_PATHMOVE:
 			/* unsupported */
 			break;
-		case JTAG_TMS:
+		case JTAG_CMD_TMS:
 			/* unsupported */
 			break;
-		case JTAG_SLEEP:
+		case JTAG_CMD_SLEEP:
 			jtag_sleep(cmd->cmd.sleep->us);
 			break;
-		case JTAG_SCAN:
+		case JTAG_CMD_SCAN:
 			ret = jtag_dpi_scan(cmd->cmd.scan);
 			break;
 		default:

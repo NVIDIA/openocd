@@ -97,7 +97,7 @@ static int vsllink_execute_queue(void)
 
 	while (cmd) {
 		switch (cmd->type) {
-			case JTAG_RUNTEST:
+			case JTAG_CMD_RUNTEST:
 				LOG_DEBUG_IO("runtest %i cycles, end in %s",
 						cmd->cmd.runtest->num_cycles,
 						tap_state_name(cmd->cmd.runtest->end_state));
@@ -106,7 +106,7 @@ static int vsllink_execute_queue(void)
 				vsllink_runtest(cmd->cmd.runtest->num_cycles);
 				break;
 
-			case JTAG_TLR_RESET:
+			case JTAG_CMD_TLR_RESET:
 				LOG_DEBUG_IO("statemove end in %s",
 						tap_state_name(cmd->cmd.statemove->end_state));
 
@@ -114,7 +114,7 @@ static int vsllink_execute_queue(void)
 				vsllink_state_move();
 				break;
 
-			case JTAG_PATHMOVE:
+			case JTAG_CMD_PATHMOVE:
 				LOG_DEBUG_IO("pathmove: %i states, end in %s",
 						cmd->cmd.pathmove->num_states,
 						tap_state_name(cmd->cmd.pathmove->path[cmd->cmd.pathmove->num_states - 1]));
@@ -122,7 +122,7 @@ static int vsllink_execute_queue(void)
 				vsllink_path_move(cmd->cmd.pathmove->num_states, cmd->cmd.pathmove->path);
 				break;
 
-			case JTAG_SCAN:
+			case JTAG_CMD_SCAN:
 				LOG_DEBUG_IO("JTAG Scan...");
 
 				vsllink_end_state(cmd->cmd.scan->end_state);
@@ -154,13 +154,13 @@ static int vsllink_execute_queue(void)
 						cmd->cmd.scan);
 				break;
 
-			case JTAG_SLEEP:
+			case JTAG_CMD_SLEEP:
 				LOG_DEBUG_IO("sleep %" PRIu32, cmd->cmd.sleep->us);
 				vsllink_tap_execute();
 				jtag_sleep(cmd->cmd.sleep->us);
 				break;
 
-			case JTAG_STABLECLOCKS:
+			case JTAG_CMD_STABLECLOCKS:
 				LOG_DEBUG_IO("add %d clocks",
 						cmd->cmd.stableclocks->num_cycles);
 
@@ -190,7 +190,7 @@ static int vsllink_execute_queue(void)
 				vsllink_stableclocks(cmd->cmd.stableclocks->num_cycles, scan_size);
 				break;
 
-				case JTAG_TMS:
+				case JTAG_CMD_TMS:
 					LOG_DEBUG_IO("add %d jtag tms",
 							cmd->cmd.tms->num_bits);
 

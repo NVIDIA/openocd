@@ -59,7 +59,7 @@ int interface_jtag_add_ir_scan(struct jtag_tap *active,
 
 	jtag_queue_command(cmd);
 
-	cmd->type = JTAG_SCAN;
+	cmd->type = JTAG_CMD_SCAN;
 	cmd->cmd.scan = scan;
 
 	scan->ir_scan = true;
@@ -122,7 +122,7 @@ int interface_jtag_add_dr_scan(struct jtag_tap *active, int in_num_fields,
 
 	jtag_queue_command(cmd);
 
-	cmd->type = JTAG_SCAN;
+	cmd->type = JTAG_CMD_SCAN;
 	cmd->cmd.scan = scan;
 
 	scan->ir_scan = false;
@@ -177,7 +177,7 @@ static int jtag_add_plain_scan(int num_bits, const uint8_t *out_bits,
 
 	jtag_queue_command(cmd);
 
-	cmd->type = JTAG_SCAN;
+	cmd->type = JTAG_CMD_SCAN;
 	cmd->cmd.scan = scan;
 
 	scan->ir_scan = ir_scan;
@@ -211,7 +211,7 @@ int interface_jtag_add_tlr(void)
 
 	jtag_queue_command(cmd);
 
-	cmd->type = JTAG_TLR_RESET;
+	cmd->type = JTAG_CMD_TLR_RESET;
 
 	cmd->cmd.statemove = cmd_queue_alloc(sizeof(struct statemove_command));
 	cmd->cmd.statemove->end_state = state;
@@ -227,7 +227,7 @@ int interface_add_tms_seq(unsigned num_bits, const uint8_t *seq, enum tap_state 
 	if (!cmd)
 		return ERROR_FAIL;
 
-	cmd->type = JTAG_TMS;
+	cmd->type = JTAG_CMD_TMS;
 	cmd->cmd.tms = cmd_queue_alloc(sizeof(*cmd->cmd.tms));
 	if (!cmd->cmd.tms)
 		return ERROR_FAIL;
@@ -251,7 +251,7 @@ int interface_jtag_add_pathmove(int num_states, const tap_state_t *path)
 
 	jtag_queue_command(cmd);
 
-	cmd->type = JTAG_PATHMOVE;
+	cmd->type = JTAG_CMD_PATHMOVE;
 
 	cmd->cmd.pathmove = cmd_queue_alloc(sizeof(struct pathmove_command));
 	cmd->cmd.pathmove->num_states = num_states;
@@ -270,7 +270,7 @@ int interface_jtag_add_runtest(int num_cycles, tap_state_t state)
 
 	jtag_queue_command(cmd);
 
-	cmd->type = JTAG_RUNTEST;
+	cmd->type = JTAG_CMD_RUNTEST;
 
 	cmd->cmd.runtest = cmd_queue_alloc(sizeof(struct runtest_command));
 	cmd->cmd.runtest->num_cycles = num_cycles;
@@ -286,7 +286,7 @@ int interface_jtag_add_clocks(int num_cycles)
 
 	jtag_queue_command(cmd);
 
-	cmd->type = JTAG_STABLECLOCKS;
+	cmd->type = JTAG_CMD_STABLECLOCKS;
 
 	cmd->cmd.stableclocks = cmd_queue_alloc(sizeof(struct stableclocks_command));
 	cmd->cmd.stableclocks->num_cycles = num_cycles;
@@ -301,7 +301,7 @@ int interface_jtag_add_reset(int req_trst, int req_srst)
 
 	jtag_queue_command(cmd);
 
-	cmd->type = JTAG_RESET;
+	cmd->type = JTAG_CMD_RESET;
 
 	cmd->cmd.reset = cmd_queue_alloc(sizeof(struct reset_command));
 	cmd->cmd.reset->trst = req_trst;
@@ -317,7 +317,7 @@ int interface_jtag_add_sleep(uint32_t us)
 
 	jtag_queue_command(cmd);
 
-	cmd->type = JTAG_SLEEP;
+	cmd->type = JTAG_CMD_SLEEP;
 
 	cmd->cmd.sleep = cmd_queue_alloc(sizeof(struct sleep_command));
 	cmd->cmd.sleep->us = us;

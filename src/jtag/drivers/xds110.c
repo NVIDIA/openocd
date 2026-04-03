@@ -1820,28 +1820,28 @@ static void xds110_queue_stableclocks(struct jtag_command *cmd)
 static void xds110_execute_command(struct jtag_command *cmd)
 {
 	switch (cmd->type) {
-		case JTAG_SLEEP:
+		case JTAG_CMD_SLEEP:
 			xds110_flush();
 			xds110_execute_sleep(cmd);
 			break;
-		case JTAG_TLR_RESET:
+		case JTAG_CMD_TLR_RESET:
 			xds110_flush();
 			xds110_execute_tlr_reset(cmd);
 			break;
-		case JTAG_PATHMOVE:
+		case JTAG_CMD_PATHMOVE:
 			xds110_flush();
 			xds110_execute_pathmove(cmd);
 			break;
-		case JTAG_SCAN:
+		case JTAG_CMD_SCAN:
 			xds110_queue_scan(cmd);
 			break;
-		case JTAG_RUNTEST:
+		case JTAG_CMD_RUNTEST:
 			xds110_queue_runtest(cmd);
 			break;
-		case JTAG_STABLECLOCKS:
+		case JTAG_CMD_STABLECLOCKS:
 			xds110_queue_stableclocks(cmd);
 			break;
-		case JTAG_TMS:
+		case JTAG_CMD_TMS:
 		default:
 			LOG_ERROR("BUG: unknown JTAG command type 0x%x encountered",
 				cmd->type);

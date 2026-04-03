@@ -1763,32 +1763,32 @@ static void cmsis_dap_execute_tms(struct jtag_command *cmd)
 	cmsis_dap_cmd_dap_swj_sequence(cmd->cmd.tms->num_bits, cmd->cmd.tms->bits);
 }
 
-/* TODO: Is there need to call cmsis_dap_flush() for the JTAG_PATHMOVE,
- * JTAG_RUNTEST, JTAG_STABLECLOCKS? */
+/* TODO: Is there need to call cmsis_dap_flush() for the JTAG_CMD_PATHMOVE,
+ * JTAG_CMD_RUNTEST, JTAG_CMD_STABLECLOCKS? */
 static void cmsis_dap_execute_command(struct jtag_command *cmd)
 {
 	switch (cmd->type) {
-		case JTAG_SLEEP:
+		case JTAG_CMD_SLEEP:
 			cmsis_dap_flush();
 			cmsis_dap_execute_sleep(cmd);
 			break;
-		case JTAG_TLR_RESET:
+		case JTAG_CMD_TLR_RESET:
 			cmsis_dap_flush();
 			cmsis_dap_execute_tlr_reset(cmd);
 			break;
-		case JTAG_SCAN:
+		case JTAG_CMD_SCAN:
 			cmsis_dap_execute_scan(cmd);
 			break;
-		case JTAG_PATHMOVE:
+		case JTAG_CMD_PATHMOVE:
 			cmsis_dap_execute_pathmove(cmd);
 			break;
-		case JTAG_RUNTEST:
+		case JTAG_CMD_RUNTEST:
 			cmsis_dap_execute_runtest(cmd);
 			break;
-		case JTAG_STABLECLOCKS:
+		case JTAG_CMD_STABLECLOCKS:
 			cmsis_dap_execute_stableclocks(cmd);
 			break;
-		case JTAG_TMS:
+		case JTAG_CMD_TMS:
 			cmsis_dap_execute_tms(cmd);
 			break;
 		default:

@@ -303,7 +303,7 @@ int bitbang_execute_queue(void)
 
 	while (cmd) {
 		switch (cmd->type) {
-			case JTAG_RUNTEST:
+			case JTAG_CMD_RUNTEST:
 				LOG_DEBUG_IO("runtest %i cycles, end in %s",
 						cmd->cmd.runtest->num_cycles,
 						tap_state_name(cmd->cmd.runtest->end_state));
@@ -312,7 +312,7 @@ int bitbang_execute_queue(void)
 					return ERROR_FAIL;
 				break;
 
-			case JTAG_STABLECLOCKS:
+			case JTAG_CMD_STABLECLOCKS:
 				/* this is only allowed while in a stable state.  A check for a stable
 				 * state was done in jtag_add_clocks()
 				 */
@@ -320,21 +320,21 @@ int bitbang_execute_queue(void)
 					return ERROR_FAIL;
 				break;
 
-			case JTAG_TLR_RESET:
+			case JTAG_CMD_TLR_RESET:
 				LOG_DEBUG_IO("statemove end in %s",
 						tap_state_name(cmd->cmd.statemove->end_state));
 				bitbang_end_state(cmd->cmd.statemove->end_state);
 				if (bitbang_state_move(0) != ERROR_OK)
 					return ERROR_FAIL;
 				break;
-			case JTAG_PATHMOVE:
+			case JTAG_CMD_PATHMOVE:
 				LOG_DEBUG_IO("pathmove: %i states, end in %s",
 						cmd->cmd.pathmove->num_states,
 						tap_state_name(cmd->cmd.pathmove->path[cmd->cmd.pathmove->num_states - 1]));
 				if (bitbang_path_move(cmd->cmd.pathmove) != ERROR_OK)
 					return ERROR_FAIL;
 				break;
-			case JTAG_SCAN:
+			case JTAG_CMD_SCAN:
 				bitbang_end_state(cmd->cmd.scan->end_state);
 				scan_size = jtag_build_buffer(cmd->cmd.scan, &buffer);
 				LOG_DEBUG_IO("%s scan %d bits; end in %s",
@@ -349,11 +349,11 @@ int bitbang_execute_queue(void)
 					retval = ERROR_JTAG_QUEUE_FAILED;
 				free(buffer);
 				break;
-			case JTAG_SLEEP:
+			case JTAG_CMD_SLEEP:
 				LOG_DEBUG_IO("sleep %" PRIu32, cmd->cmd.sleep->us);
 				jtag_sleep(cmd->cmd.sleep->us);
 				break;
-			case JTAG_TMS:
+			case JTAG_CMD_TMS:
 				retval = bitbang_execute_tms(cmd);
 				break;
 			default:

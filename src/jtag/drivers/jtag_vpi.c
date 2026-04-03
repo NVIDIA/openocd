@@ -488,29 +488,29 @@ static int jtag_vpi_execute_queue(void)
 	for (cmd = jtag_command_queue; retval == ERROR_OK && cmd;
 	     cmd = cmd->next) {
 		switch (cmd->type) {
-		case JTAG_RESET:
+		case JTAG_CMD_RESET:
 			retval = jtag_vpi_reset(cmd->cmd.reset->trst, cmd->cmd.reset->srst);
 			break;
-		case JTAG_RUNTEST:
+		case JTAG_CMD_RUNTEST:
 			retval = jtag_vpi_runtest(cmd->cmd.runtest->num_cycles,
 						  cmd->cmd.runtest->end_state);
 			break;
-		case JTAG_STABLECLOCKS:
+		case JTAG_CMD_STABLECLOCKS:
 			retval = jtag_vpi_stableclocks(cmd->cmd.stableclocks->num_cycles);
 			break;
-		case JTAG_TLR_RESET:
+		case JTAG_CMD_TLR_RESET:
 			retval = jtag_vpi_state_move(cmd->cmd.statemove->end_state);
 			break;
-		case JTAG_PATHMOVE:
+		case JTAG_CMD_PATHMOVE:
 			retval = jtag_vpi_path_move(cmd->cmd.pathmove);
 			break;
-		case JTAG_TMS:
+		case JTAG_CMD_TMS:
 			retval = jtag_vpi_tms(cmd->cmd.tms);
 			break;
-		case JTAG_SLEEP:
+		case JTAG_CMD_SLEEP:
 			jtag_sleep(cmd->cmd.sleep->us);
 			break;
-		case JTAG_SCAN:
+		case JTAG_CMD_SCAN:
 			retval = jtag_vpi_scan(cmd->cmd.scan);
 			break;
 		default:

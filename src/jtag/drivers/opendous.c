@@ -247,7 +247,7 @@ static int opendous_execute_queue(void)
 
 	while (cmd) {
 		switch (cmd->type) {
-			case JTAG_RUNTEST:
+			case JTAG_CMD_RUNTEST:
 				LOG_DEBUG_IO("runtest %i cycles, end in %i", cmd->cmd.runtest->num_cycles,
 					cmd->cmd.runtest->end_state);
 
@@ -256,7 +256,7 @@ static int opendous_execute_queue(void)
 				opendous_runtest(cmd->cmd.runtest->num_cycles);
 				break;
 
-			case JTAG_TLR_RESET:
+			case JTAG_CMD_TLR_RESET:
 				LOG_DEBUG_IO("statemove end in %i", cmd->cmd.statemove->end_state);
 
 				if (cmd->cmd.statemove->end_state != -1)
@@ -264,7 +264,7 @@ static int opendous_execute_queue(void)
 				opendous_state_move();
 				break;
 
-			case JTAG_PATHMOVE:
+			case JTAG_CMD_PATHMOVE:
 				LOG_DEBUG_IO("pathmove: %i states, end in %i",
 					cmd->cmd.pathmove->num_states,
 					cmd->cmd.pathmove->path[cmd->cmd.pathmove->num_states - 1]);
@@ -272,7 +272,7 @@ static int opendous_execute_queue(void)
 				opendous_path_move(cmd->cmd.pathmove->num_states, cmd->cmd.pathmove->path);
 				break;
 
-			case JTAG_SCAN:
+			case JTAG_CMD_SCAN:
 				LOG_DEBUG_IO("scan end in %i", cmd->cmd.scan->end_state);
 
 				if (cmd->cmd.scan->end_state != -1)
@@ -288,7 +288,7 @@ static int opendous_execute_queue(void)
 				opendous_scan(cmd->cmd.scan->ir_scan, type, buffer, scan_size, cmd->cmd.scan);
 				break;
 
-			case JTAG_RESET:
+			case JTAG_CMD_RESET:
 				LOG_DEBUG_IO("reset trst: %i srst %i", cmd->cmd.reset->trst, cmd->cmd.reset->srst);
 
 				opendous_tap_execute();
@@ -298,7 +298,7 @@ static int opendous_execute_queue(void)
 				opendous_reset(cmd->cmd.reset->trst, cmd->cmd.reset->srst);
 				break;
 
-			case JTAG_SLEEP:
+			case JTAG_CMD_SLEEP:
 				LOG_DEBUG_IO("sleep %" PRIu32, cmd->cmd.sleep->us);
 				opendous_tap_execute();
 				jtag_sleep(cmd->cmd.sleep->us);

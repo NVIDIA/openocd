@@ -161,7 +161,7 @@ static int buspirate_execute_queue(void)
 
 	while (cmd) {
 		switch (cmd->type) {
-		case JTAG_RUNTEST:
+		case JTAG_CMD_RUNTEST:
 			LOG_DEBUG_IO("runtest %i cycles, end in %s",
 				cmd->cmd.runtest->num_cycles,
 				tap_state_name(cmd->cmd.runtest
@@ -171,7 +171,7 @@ static int buspirate_execute_queue(void)
 			buspirate_runtest(cmd->cmd.runtest
 					->num_cycles);
 			break;
-		case JTAG_TLR_RESET:
+		case JTAG_CMD_TLR_RESET:
 			LOG_DEBUG_IO("statemove end in %s",
 				tap_state_name(cmd->cmd.statemove
 						->end_state));
@@ -179,7 +179,7 @@ static int buspirate_execute_queue(void)
 					->end_state);
 			buspirate_state_move();
 			break;
-		case JTAG_PATHMOVE:
+		case JTAG_CMD_PATHMOVE:
 			LOG_DEBUG_IO("pathmove: %i states, end in %s",
 				cmd->cmd.pathmove->num_states,
 				tap_state_name(cmd->cmd.pathmove
@@ -189,7 +189,7 @@ static int buspirate_execute_queue(void)
 					->num_states,
 					cmd->cmd.pathmove->path);
 			break;
-		case JTAG_SCAN:
+		case JTAG_CMD_SCAN:
 			LOG_DEBUG_IO("scan end in %s",
 				tap_state_name(cmd->cmd.scan
 					->end_state));
@@ -204,12 +204,12 @@ static int buspirate_execute_queue(void)
 				buffer, scan_size, cmd->cmd.scan);
 
 			break;
-		case JTAG_SLEEP:
+		case JTAG_CMD_SLEEP:
 			LOG_DEBUG_IO("sleep %" PRIu32, cmd->cmd.sleep->us);
 			buspirate_tap_execute();
 			jtag_sleep(cmd->cmd.sleep->us);
 				break;
-		case JTAG_STABLECLOCKS:
+		case JTAG_CMD_STABLECLOCKS:
 			LOG_DEBUG_IO("stable clock %i cycles", cmd->cmd.stableclocks->num_cycles);
 			buspirate_stableclocks(cmd->cmd.stableclocks->num_cycles);
 				break;

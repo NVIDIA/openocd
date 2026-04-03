@@ -156,7 +156,7 @@ static int aice_execute_command(struct jtag_command *cmd)
 	int retval;
 
 	switch (cmd->type) {
-		case JTAG_RESET:
+		case JTAG_CMD_RESET:
 			retval = aice_execute_reset(cmd);
 			break;
 		default:

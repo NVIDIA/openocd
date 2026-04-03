@@ -9,6 +9,9 @@
  *                                                                         *
  *   Copyright (C) 2009 Zachary T Welch                                    *
  *   zw@superlucidity.net                                                  *
+ *                                                                         *
+ *   Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES                    *
+ *   Remi Machet <rmachet@nvidia.com>                                      *
  ***************************************************************************/
 
 #ifndef OPENOCD_JTAG_COMMANDS_H
@@ -126,21 +129,21 @@ union jtag_command_container {
  * @c jtag_command_s structure.
  */
 enum jtag_command_type {
-	JTAG_SCAN         = 1,
-	/* JTAG_TLR_RESET's non-minidriver implementation is a
+	JTAG_CMD_SCAN         = 1,
+	/* JTAG_CMD_TLR_RESET's non-minidriver implementation is a
 	 * vestige from a statemove cmd. The statemove command
 	 * is obsolete and replaced by pathmove.
 	 *
 	 * pathmove does not support reset as one of it's states,
 	 * hence the need for an explicit statemove command.
 	 */
-	JTAG_TLR_RESET    = 2,
-	JTAG_RUNTEST      = 3,
-	JTAG_RESET        = 4,
-	JTAG_PATHMOVE     = 6,
-	JTAG_SLEEP        = 7,
-	JTAG_STABLECLOCKS = 8,
-	JTAG_TMS          = 9,
+	JTAG_CMD_TLR_RESET    = 2,
+	JTAG_CMD_RUNTEST      = 3,
+	JTAG_CMD_RESET        = 4,
+	JTAG_CMD_PATHMOVE     = 6,
+	JTAG_CMD_SLEEP        = 7,
+	JTAG_CMD_STABLECLOCKS = 8,
+	JTAG_CMD_TMS          = 9,
 };
 
 struct jtag_command {

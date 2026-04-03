@@ -559,7 +559,7 @@ static int osbdm_execute_command(
 	int retval = ERROR_OK;
 
 	switch (cmd->type) {
-	case JTAG_RESET:
+	case JTAG_CMD_RESET:
 		if (cmd->cmd.reset->trst) {
 			LOG_ERROR("BUG: nTRST signal is not supported");
 			retval = ERROR_FAIL;
@@ -570,34 +570,34 @@ static int osbdm_execute_command(
 		}
 		break;
 
-	case JTAG_PATHMOVE:
+	case JTAG_CMD_PATHMOVE:
 		retval = osbdm_add_pathmove(
 			queue,
 			cmd->cmd.pathmove->path,
 			cmd->cmd.pathmove->num_states);
 		break;
 
-	case JTAG_TLR_RESET:
+	case JTAG_CMD_TLR_RESET:
 		retval = osbdm_add_statemove(
 			queue,
 			cmd->cmd.statemove->end_state,
 			0);
 		break;
 
-	case JTAG_STABLECLOCKS:
+	case JTAG_CMD_STABLECLOCKS:
 		retval = osbdm_add_stableclocks(
 			queue,
 			cmd->cmd.stableclocks->num_cycles);
 		break;
 
-	case JTAG_TMS:
+	case JTAG_CMD_TMS:
 		retval = osbdm_add_tms(
 			queue,
 			cmd->cmd.tms->bits,
 			cmd->cmd.tms->num_bits);
 		break;
 
-	case JTAG_SCAN:
+	case JTAG_CMD_SCAN:
 		retval = osbdm_add_scan(
 			queue,
 			cmd->cmd.scan->fields,
@@ -606,13 +606,13 @@ static int osbdm_execute_command(
 			cmd->cmd.scan->ir_scan);
 		break;
 
-	case JTAG_SLEEP:
+	case JTAG_CMD_SLEEP:
 		retval = osbdm_flush(osbdm, queue);
 		if (retval == ERROR_OK)
 			jtag_sleep(cmd->cmd.sleep->us);
 		break;
 
-	case JTAG_RUNTEST:
+	case JTAG_CMD_RUNTEST:
 		retval = osbdm_add_runtest(
 			queue,
 			cmd->cmd.runtest->num_cycles,

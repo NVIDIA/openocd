@@ -1046,25 +1046,25 @@ static int vdebug_jtag_execute_queue(void)
 
 	for (struct jtag_command *cmd = jtag_command_queue; rc == ERROR_OK && cmd; cmd = cmd->next) {
 		switch (cmd->type) {
-		case JTAG_RUNTEST:
+		case JTAG_CMD_RUNTEST:
 			rc = vdebug_jtag_runtest(cmd->cmd.runtest->num_cycles, cmd->cmd.runtest->end_state, !cmd->next);
 			break;
-		case JTAG_STABLECLOCKS:
+		case JTAG_CMD_STABLECLOCKS:
 			rc = vdebug_jtag_stableclocks(cmd->cmd.stableclocks->num_cycles, !cmd->next);
 			break;
-		case JTAG_TLR_RESET:
+		case JTAG_CMD_TLR_RESET:
 			rc = vdebug_jtag_tlr(cmd->cmd.statemove->end_state, !cmd->next);
 			break;
-		case JTAG_PATHMOVE:
+		case JTAG_CMD_PATHMOVE:
 			rc = vdebug_jtag_path_move(cmd->cmd.pathmove, !cmd->next);
 			break;
-		case JTAG_TMS:
+		case JTAG_CMD_TMS:
 			rc = vdebug_jtag_tms_seq(cmd->cmd.tms->bits, cmd->cmd.tms->num_bits, !cmd->next);
 			break;
-		case JTAG_SLEEP:
+		case JTAG_CMD_SLEEP:
 			rc = vdebug_sleep(cmd->cmd.sleep->us);
 			break;
-		case JTAG_SCAN:
+		case JTAG_CMD_SCAN:
 			rc = vdebug_jtag_scan(cmd->cmd.scan, !cmd->next);
 			break;
 		default:

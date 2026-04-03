@@ -32,8 +32,8 @@ static void bitq_in_proc(void)
 {
 	/* loop through the queue */
 	while (bitq_in_state.cmd) {
-		/* only JTAG_SCAN command may return data */
-		if (bitq_in_state.cmd->type == JTAG_SCAN) {
+		/* only JTAG_CMD_SCAN command may return data */
+		if (bitq_in_state.cmd->type == JTAG_CMD_SCAN) {
 			/* loop through the fields */
 			while (bitq_in_state.field_idx < bitq_in_state.cmd->cmd.scan->num_fields) {
 				struct scan_field *field;
@@ -214,7 +214,7 @@ int bitq_execute_queue(void)
 
 	while (cmd) {
 		switch (cmd->type) {
-		case JTAG_RESET:
+		case JTAG_CMD_RESET:
 			LOG_DEBUG_IO("reset trst: %i srst %i", cmd->cmd.reset->trst, cmd->cmd.reset->srst);
 			if ((cmd->cmd.reset->trst == 1) ||
 					(cmd->cmd.reset->srst &&
@@ -225,25 +225,25 @@ int bitq_execute_queue(void)
 				bitq_in_proc();
 			break;
 
-		case JTAG_RUNTEST:
+		case JTAG_CMD_RUNTEST:
 			LOG_DEBUG_IO("runtest %i cycles, end in %i", cmd->cmd.runtest->num_cycles, cmd->cmd.runtest->end_state);
 			bitq_end_state(cmd->cmd.runtest->end_state);
 			bitq_runtest(cmd->cmd.runtest->num_cycles);
 			break;
 
-		case JTAG_TLR_RESET:
+		case JTAG_CMD_TLR_RESET:
 			LOG_DEBUG_IO("statemove end in %i", cmd->cmd.statemove->end_state);
 			bitq_end_state(cmd->cmd.statemove->end_state);
 			bitq_state_move(tap_get_end_state());   /* unconditional TAP move */
 			break;
 
-		case JTAG_PATHMOVE:
+		case JTAG_CMD_PATHMOVE:
 			LOG_DEBUG_IO("pathmove: %i states, end in %i", cmd->cmd.pathmove->num_states,
 					cmd->cmd.pathmove->path[cmd->cmd.pathmove->num_states - 1]);
 			bitq_path_move(cmd->cmd.pathmove);
 			break;
 
-		case JTAG_SCAN:
+		case JTAG_CMD_SCAN:
 			LOG_DEBUG_IO("scan end in %i", cmd->cmd.scan->end_state);
 			LOG_DEBUG_IO("scan %s", cmd->cmd.scan->ir_scan ? "ir" : "dr");
 			bitq_end_state(cmd->cmd.scan->end_state);
@@ -252,7 +252,7 @@ int bitq_execute_queue(void)
 				bitq_state_move(tap_get_end_state());
 			break;
 
-		case JTAG_SLEEP:
+		case JTAG_CMD_SLEEP:
 			LOG_DEBUG_IO("sleep %" PRIu32, cmd->cmd.sleep->us);
 			bitq_interface->sleep(cmd->cmd.sleep->us);
 			if (bitq_interface->in_rdy())

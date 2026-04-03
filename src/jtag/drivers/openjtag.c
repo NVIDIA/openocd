@@ -765,22 +765,22 @@ static void openjtag_execute_command(struct jtag_command *cmd)
 {
 	LOG_DEBUG_IO("openjtag_execute_command %i", cmd->type);
 	switch (cmd->type) {
-	case JTAG_RESET:
+	case JTAG_CMD_RESET:
 			openjtag_execute_reset(cmd);
 			break;
-	case JTAG_SLEEP:
+	case JTAG_CMD_SLEEP:
 			openjtag_execute_sleep(cmd);
 			break;
-	case JTAG_TLR_RESET:
+	case JTAG_CMD_TLR_RESET:
 			openjtag_execute_statemove(cmd);
 			break;
-	case JTAG_SCAN:
+	case JTAG_CMD_SCAN:
 			openjtag_execute_scan(cmd);
 			break;
-	case JTAG_RUNTEST:
+	case JTAG_CMD_RUNTEST:
 			openjtag_execute_runtest(cmd);
 			break;
-	case JTAG_PATHMOVE:
+	case JTAG_CMD_PATHMOVE:
 		/* jlink_execute_pathmove(cmd); break; */
 	default:
 		LOG_ERROR("BUG: unknown Open JTAG command type encountered");

@@ -1283,10 +1283,10 @@ static int rlink_execute_queue(void)
 
 	while (cmd) {
 		switch (cmd->type) {
-			case JTAG_RUNTEST:
-			case JTAG_TLR_RESET:
-			case JTAG_PATHMOVE:
-			case JTAG_SCAN:
+			case JTAG_CMD_RUNTEST:
+			case JTAG_CMD_TLR_RESET:
+			case JTAG_CMD_PATHMOVE:
+			case JTAG_CMD_SCAN:
 				break;
 
 			default:
@@ -1298,7 +1298,7 @@ static int rlink_execute_queue(void)
 		}
 
 		switch (cmd->type) {
-			case JTAG_RESET:
+			case JTAG_CMD_RESET:
 				LOG_DEBUG_IO("reset trst: %i srst %i",
 						cmd->cmd.reset->trst,
 						cmd->cmd.reset->srst);
@@ -1308,7 +1308,7 @@ static int rlink_execute_queue(void)
 					tap_set_state(TAP_RESET);
 				rlink_reset(cmd->cmd.reset->trst, cmd->cmd.reset->srst);
 				break;
-			case JTAG_RUNTEST:
+			case JTAG_CMD_RUNTEST:
 				LOG_DEBUG_IO("runtest %i cycles, end in %i",
 						cmd->cmd.runtest->num_cycles,
 						cmd->cmd.runtest->end_state);
@@ -1316,19 +1316,19 @@ static int rlink_execute_queue(void)
 					rlink_end_state(cmd->cmd.runtest->end_state);
 				rlink_runtest(cmd->cmd.runtest->num_cycles);
 				break;
-			case JTAG_TLR_RESET:
+			case JTAG_CMD_TLR_RESET:
 				LOG_DEBUG_IO("statemove end in %i", cmd->cmd.statemove->end_state);
 				if (cmd->cmd.statemove->end_state != -1)
 					rlink_end_state(cmd->cmd.statemove->end_state);
 				rlink_state_move();
 				break;
-			case JTAG_PATHMOVE:
+			case JTAG_CMD_PATHMOVE:
 				LOG_DEBUG_IO("pathmove: %i states, end in %i",
 						cmd->cmd.pathmove->num_states,
 						cmd->cmd.pathmove->path[cmd->cmd.pathmove->num_states - 1]);
 				rlink_path_move(cmd->cmd.pathmove);
 				break;
-			case JTAG_SCAN:
+			case JTAG_CMD_SCAN:
 				LOG_DEBUG_IO("%s scan end in %i",
 						(cmd->cmd.scan->ir_scan) ? "IR" : "DR",
 								cmd->cmd.scan->end_state);
@@ -1339,7 +1339,7 @@ static int rlink_execute_queue(void)
 				if (rlink_scan(cmd, type, buffer, scan_size) != ERROR_OK)
 					retval = ERROR_FAIL;
 				break;
-			case JTAG_SLEEP:
+			case JTAG_CMD_SLEEP:
 				LOG_DEBUG_IO("sleep %" PRIu32, cmd->cmd.sleep->us);
 				jtag_sleep(cmd->cmd.sleep->us);
 				break;

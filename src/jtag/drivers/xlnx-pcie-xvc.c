@@ -335,24 +335,24 @@ static int xlnx_pcie_xvc_execute_command(struct jtag_command *cmd)
 {
 	LOG_DEBUG("%s: cmd->type: %u", __func__, cmd->type);
 	switch (cmd->type) {
-	case JTAG_STABLECLOCKS:
+	case JTAG_CMD_STABLECLOCKS:
 		return xlnx_pcie_xvc_execute_stableclocks(cmd);
-	case JTAG_RUNTEST:
+	case JTAG_CMD_RUNTEST:
 		return xlnx_pcie_xvc_execute_runtest(cmd);
-	case JTAG_TLR_RESET:
+	case JTAG_CMD_TLR_RESET:
 		tap_set_end_state(cmd->cmd.statemove->end_state);
 		return xlnx_pcie_xvc_execute_statemove(0);
-	case JTAG_PATHMOVE:
+	case JTAG_CMD_PATHMOVE:
 		return xlnx_pcie_xvc_execute_pathmove(cmd);
-	case JTAG_SCAN:
+	case JTAG_CMD_SCAN:
 		return xlnx_pcie_xvc_execute_scan(cmd);
-	case JTAG_RESET:
+	case JTAG_CMD_RESET:
 		xlnx_pcie_xvc_execute_reset(cmd);
 		break;
-	case JTAG_SLEEP:
+	case JTAG_CMD_SLEEP:
 		xlnx_pcie_xvc_execute_sleep(cmd);
 		break;
-	case JTAG_TMS:
+	case JTAG_CMD_TMS:
 		return xlnx_pcie_xvc_execute_tms(cmd);
 	default:
 		LOG_ERROR("BUG: Unknown JTAG command type encountered.");

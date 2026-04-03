@@ -820,7 +820,7 @@ static int syncbb_execute_queue(void)
 
 	while (cmd) {
 		switch (cmd->type) {
-			case JTAG_RESET:
+			case JTAG_CMD_RESET:
 				LOG_DEBUG_IO("reset trst: %i srst %i", cmd->cmd.reset->trst, cmd->cmd.reset->srst);
 
 				if ((cmd->cmd.reset->trst == 1) ||
@@ -831,7 +831,7 @@ static int syncbb_execute_queue(void)
 				ft232r_reset(cmd->cmd.reset->trst, cmd->cmd.reset->srst);
 				break;
 
-			case JTAG_RUNTEST:
+			case JTAG_CMD_RUNTEST:
 				LOG_DEBUG_IO("runtest %i cycles, end in %s", cmd->cmd.runtest->num_cycles,
 					tap_state_name(cmd->cmd.runtest->end_state));
 
@@ -839,28 +839,28 @@ static int syncbb_execute_queue(void)
 				syncbb_runtest(cmd->cmd.runtest->num_cycles);
 				break;
 
-			case JTAG_STABLECLOCKS:
+			case JTAG_CMD_STABLECLOCKS:
 				/* this is only allowed while in a stable state.  A check for a stable
 				 * state was done in jtag_add_clocks()
 				 */
 				syncbb_stableclocks(cmd->cmd.stableclocks->num_cycles);
 				break;
 
-			case JTAG_TLR_RESET: /* renamed from JTAG_STATEMOVE */
+			case JTAG_CMD_TLR_RESET: /* renamed from JTAG_STATEMOVE */
 				LOG_DEBUG_IO("statemove end in %s", tap_state_name(cmd->cmd.statemove->end_state));
 
 				syncbb_end_state(cmd->cmd.statemove->end_state);
 				syncbb_state_move(0);
 				break;
 
-			case JTAG_PATHMOVE:
+			case JTAG_CMD_PATHMOVE:
 				LOG_DEBUG_IO("pathmove: %i states, end in %s", cmd->cmd.pathmove->num_states,
 					tap_state_name(cmd->cmd.pathmove->path[cmd->cmd.pathmove->num_states - 1]));
 
 				syncbb_path_move(cmd->cmd.pathmove);
 				break;
 
-			case JTAG_SCAN:
+			case JTAG_CMD_SCAN:
 				LOG_DEBUG_IO("%s scan end in %s",  (cmd->cmd.scan->ir_scan) ? "IR" : "DR",
 					tap_state_name(cmd->cmd.scan->end_state));
 
@@ -873,13 +873,13 @@ static int syncbb_execute_queue(void)
 				free(buffer);
 				break;
 
-			case JTAG_SLEEP:
+			case JTAG_CMD_SLEEP:
 				LOG_DEBUG_IO("sleep %" PRIu32, cmd->cmd.sleep->us);
 
 				jtag_sleep(cmd->cmd.sleep->us);
 				break;
 
-			case JTAG_TMS:
+			case JTAG_CMD_TMS:
 				retval = syncbb_execute_tms(cmd);
 				break;
 			default:

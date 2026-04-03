@@ -779,29 +779,29 @@ static int ublast_execute_queue(void)
 	for (cmd = jtag_command_queue; ret == ERROR_OK && cmd;
 	     cmd = cmd->next) {
 		switch (cmd->type) {
-		case JTAG_RESET:
+		case JTAG_CMD_RESET:
 			ublast_reset(cmd->cmd.reset->trst, cmd->cmd.reset->srst);
 			break;
-		case JTAG_RUNTEST:
+		case JTAG_CMD_RUNTEST:
 			ublast_runtest(cmd->cmd.runtest->num_cycles,
 				       cmd->cmd.runtest->end_state);
 			break;
-		case JTAG_STABLECLOCKS:
+		case JTAG_CMD_STABLECLOCKS:
 			ublast_stableclocks(cmd->cmd.stableclocks->num_cycles);
 			break;
-		case JTAG_TLR_RESET:
+		case JTAG_CMD_TLR_RESET:
 			ublast_state_move(cmd->cmd.statemove->end_state, 0);
 			break;
-		case JTAG_PATHMOVE:
+		case JTAG_CMD_PATHMOVE:
 			ublast_path_move(cmd->cmd.pathmove);
 			break;
-		case JTAG_TMS:
+		case JTAG_CMD_TMS:
 			ublast_tms(cmd->cmd.tms);
 			break;
-		case JTAG_SLEEP:
+		case JTAG_CMD_SLEEP:
 			ublast_usleep(cmd->cmd.sleep->us);
 			break;
-		case JTAG_SCAN:
+		case JTAG_CMD_SCAN:
 			ret = ublast_scan(cmd->cmd.scan);
 			break;
 		default:

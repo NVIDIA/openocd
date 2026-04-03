@@ -250,22 +250,22 @@ static void jlink_execute_sleep(struct jtag_command *cmd)
 static int jlink_execute_command(struct jtag_command *cmd)
 {
 	switch (cmd->type) {
-		case JTAG_STABLECLOCKS:
+		case JTAG_CMD_STABLECLOCKS:
 			jlink_execute_stableclocks(cmd);
 			break;
-		case JTAG_RUNTEST:
+		case JTAG_CMD_RUNTEST:
 			jlink_execute_runtest(cmd);
 			break;
-		case JTAG_TLR_RESET:
+		case JTAG_CMD_TLR_RESET:
 			jlink_execute_statemove(cmd);
 			break;
-		case JTAG_PATHMOVE:
+		case JTAG_CMD_PATHMOVE:
 			jlink_execute_pathmove(cmd);
 			break;
-		case JTAG_SCAN:
+		case JTAG_CMD_SCAN:
 			jlink_execute_scan(cmd);
 			break;
-		case JTAG_SLEEP:
+		case JTAG_CMD_SLEEP:
 			jlink_execute_sleep(cmd);
 			break;
 		default:
