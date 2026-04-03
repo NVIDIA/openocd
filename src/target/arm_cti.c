@@ -3,6 +3,9 @@
 /***************************************************************************
  *   Copyright (C) 2016 by Matthias Welwarsky                              *
  *                                                                         *
+ *   Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES                    *
+ *   Remi Machet - rmachet@nvidia.com                                      *
+ *                                                                         *
  ***************************************************************************/
 
 #ifdef HAVE_CONFIG_H
@@ -11,18 +14,18 @@
 
 #include <stdlib.h>
 #include <stdint.h>
-#include "target/arm_adi_v5.h"
 #include "target/arm_cti.h"
 #include "target/target.h"
 #include "helper/time_support.h"
 #include "helper/list.h"
 #include "helper/command.h"
+#include "target/mem_ap.h"
 
 struct arm_cti {
 	struct list_head lh;
 	char *name;
-	struct adiv5_mem_ap_spot spot;
-	struct adiv5_ap *ap;
+	struct mem_ap *ap;
+	target_addr_t base;
 };
 
 static LIST_HEAD(all_cti);
@@ -54,11 +57,11 @@ struct arm_cti *cti_instance_by_jim_obj(Jim_Interp *interp, Jim_Obj *o)
 
 static int arm_cti_mod_reg_bits(struct arm_cti *self, unsigned int reg, uint32_t mask, uint32_t value)
 {
-	struct adiv5_ap *ap = self->ap;
+	struct mem_ap *ap = self->ap;
 	uint32_t tmp;
 
 	/* Read register */
-	int retval = mem_ap_read_atomic_u32(ap, self->spot.base + reg, &tmp);
+	int retval = mem_ap_read_atomic_u32(ap, self->base + reg, &tmp);
 	if (retval != ERROR_OK)
 		return retval;
 
@@ -68,27 +71,27 @@ static int arm_cti_mod_reg_bits(struct arm_cti *self, unsigned int reg, uint32_t
 	tmp |= value & mask;
 
 	/* write new value */
-	return mem_ap_write_atomic_u32(ap, self->spot.base + reg, tmp);
+	return mem_ap_write_atomic_u32(ap, self->base + reg, tmp);
 }
 
 int arm_cti_enable(struct arm_cti *self, bool enable)
 {
 	uint32_t val = enable ? 1 : 0;
 
-	return mem_ap_write_atomic_u32(self->ap, self->spot.base + CTI_CTR, val);
+	return mem_ap_write_atomic_u32(self->ap, self->base + CTI_CTR, val);
 }
 
 int arm_cti_ack_events(struct arm_cti *self, uint32_t event)
 {
-	struct adiv5_ap *ap = self->ap;
+	struct mem_ap *ap = self->ap;
 	int retval;
 	uint32_t tmp;
 
-	retval = mem_ap_write_atomic_u32(ap, self->spot.base + CTI_INACK, event);
+	retval = mem_ap_write_atomic_u32(ap, self->base + CTI_INACK, event);
 	if (retval == ERROR_OK) {
 		int64_t then = timeval_ms();
 		for (;;) {
-			retval = mem_ap_read_atomic_u32(ap, self->spot.base + CTI_TROUT_STATUS, &tmp);
+			retval = mem_ap_read_atomic_u32(ap, self->base + CTI_TROUT_STATUS, &tmp);
 			if (retval != ERROR_OK)
 				break;
 			if ((tmp & event) == 0)
@@ -122,7 +125,7 @@ int arm_cti_ungate_channel(struct arm_cti *self, uint32_t channel)
 
 int arm_cti_write_reg(struct arm_cti *self, unsigned int reg, uint32_t value)
 {
-	return mem_ap_write_atomic_u32(self->ap, self->spot.base + reg, value);
+	return mem_ap_write_atomic_u32(self->ap, self->base + reg, value);
 }
 
 int arm_cti_read_reg(struct arm_cti *self, unsigned int reg, uint32_t *p_value)
@@ -130,7 +133,7 @@ int arm_cti_read_reg(struct arm_cti *self, unsigned int reg, uint32_t *p_value)
 	if (!p_value)
 		return ERROR_COMMAND_ARGUMENT_INVALID;
 
-	return mem_ap_read_atomic_u32(self->ap, self->spot.base + reg, p_value);
+	return mem_ap_read_atomic_u32(self->ap, self->base + reg, p_value);
 }
 
 int arm_cti_pulse_channel(struct arm_cti *self, uint32_t channel)
@@ -212,8 +215,7 @@ int arm_cti_cleanup_all(void)
 	struct arm_cti *obj, *tmp;
 
 	list_for_each_entry_safe(obj, tmp, &all_cti, lh) {
-		if (obj->ap)
-			dap_put_ap(obj->ap);
+		mem_ap_release(obj->ap);
 		free(obj->name);
 		free(obj);
 	}
@@ -224,15 +226,15 @@ int arm_cti_cleanup_all(void)
 COMMAND_HANDLER(handle_cti_dump)
 {
 	struct arm_cti *cti = CMD_DATA;
-	struct adiv5_ap *ap = cti->ap;
+	struct mem_ap *ap = cti->ap;
 	int retval = ERROR_OK;
 
 	for (int i = 0; (retval == ERROR_OK) && (i < (int)ARRAY_SIZE(cti_names)); i++)
 		retval = mem_ap_read_u32(ap,
-				cti->spot.base + cti_names[i].offset, cti_names[i].p_val);
+				cti->base + cti_names[i].offset, cti_names[i].p_val);
 
 	if (retval == ERROR_OK)
-		retval = dap_run(ap->dap);
+		retval = mem_ap_flush(ap);
 
 	if (retval != ERROR_OK)
 		return JIM_ERR;
@@ -416,31 +418,65 @@ static const struct command_registration cti_instance_command_handlers[] = {
 	COMMAND_REGISTRATION_DONE
 };
 
-static int cti_configure(struct jim_getopt_info *goi, struct arm_cti *cti)
+static const struct jim_nvp nvp_config_opts[] = {
+	{ .name = "-baseaddr", .value = 0 },
+	{ .name = NULL, .value = -1 }
+};
+
+static int cti_configure(struct target *target, struct jim_getopt_info *goi,
+													struct arm_cti *cti)
 {
+	struct mem_ap_private_config *mem_ap_pc = NULL;
+	
 	/* parse config or cget options ... */
 	while (goi->argc > 0) {
-		int e = adiv5_jim_mem_ap_spot_configure(&cti->spot, goi);
+		struct jim_nvp *n;
+		int e = mem_ap_find_configure(goi, &mem_ap_pc);
 
-		if (e == JIM_CONTINUE)
-			Jim_SetResultFormatted(goi->interp, "unknown option '%s'",
-				Jim_String(goi->argv[0]));
+		if (e == JIM_OK)
+			continue;
+		else if (e != JIM_CONTINUE)
+			return e;
 
-		if (e != JIM_OK)
-			return JIM_ERR;
+		e = jim_nvp_name2value_obj(goi->interp, nvp_config_opts, goi->argv[0], &n);
+		if (e != JIM_OK) {
+			Jim_SetResultFormatted(goi->interp, "unrecognized option %s",
+															Jim_String(goi->argv[0]));
+			return e;
+		}
+
+		e = jim_getopt_obj(goi, NULL);
+		if (e != JIM_OK) {
+			Jim_SetResultFormatted(goi->interp, "parsing error");
+			return e;
+		}
+		
+		switch (n->value) {
+			case 0:
+			{
+				jim_wide base;
+				e = jim_getopt_wide(goi, &base);
+				if (e != JIM_OK)
+					return e;
+				cti->base = (target_addr_t)base;
+				break;
+			}
+		}
 	}
 
-	if (!cti->spot.dap) {
-		Jim_SetResultString(goi->interp, "-dap required when creating CTI", -1);
+	cti->ap = mem_ap_find(target, &mem_ap_pc, MEM_AP_BUS_TYPE_APB);
+	if (!cti->ap) {
+		Jim_SetResultString(goi->interp, "Could not find a suitable MEM-AP to use", -1);
 		return JIM_ERR;
 	}
-
 	return JIM_OK;
 }
+
 static int cti_create(struct jim_getopt_info *goi)
 {
 	struct command_context *cmd_ctx;
 	static struct arm_cti *cti;
+	struct target *target;
 	Jim_Obj *new_cmd;
 	Jim_Cmd *cmd;
 	const char *cp;
@@ -468,11 +504,10 @@ static int cti_create(struct jim_getopt_info *goi)
 	if (!cti)
 		return JIM_ERR;
 
-	adiv5_mem_ap_spot_init(&cti->spot);
-
 	/* Do the rest as "configure" options */
 	goi->isconfigure = 1;
-	e = cti_configure(goi, cti);
+	target = get_current_target(cmd_ctx);
+	e = cti_configure(target, goi, cti);
 	if (e != JIM_OK) {
 		free(cti);
 		return e;
@@ -503,12 +538,6 @@ static int cti_create(struct jim_getopt_info *goi)
 		return JIM_ERR;
 
 	list_add_tail(&cti->lh, &all_cti);
-
-	cti->ap = dap_get_ap(cti->spot.dap, cti->spot.ap_num);
-	if (!cti->ap) {
-		Jim_SetResultString(goi->interp, "Cannot get AP", -1);
-		return JIM_ERR;
-	}
 
 	return JIM_OK;
 }

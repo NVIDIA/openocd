@@ -7,12 +7,12 @@
 #ifndef OPENOCD_TARGET_ARMV7A_H
 #define OPENOCD_TARGET_ARMV7A_H
 
-#include "arm_adi_v5.h"
 #include "armv7a_cache.h"
 #include "arm.h"
 #include "armv4_5_mmu.h"
 #include "armv4_5_cache.h"
 #include "arm_dpm.h"
+#include "mem_ap.h"
 
 enum {
 	ARM_PC  = 15,
@@ -95,7 +95,6 @@ struct armv7a_common {
 	/* Core Debug Unit */
 	struct arm_dpm dpm;
 	target_addr_t debug_base;
-	struct adiv5_ap *debug_ap;
 	/* mdir */
 	uint8_t multi_processor_system;
 	uint8_t multi_threading_processor;

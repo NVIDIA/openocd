@@ -125,6 +125,10 @@ int adapter_init(struct command_context *cmd_ctx)
 	if (is_adapter_initialized())
 		return ERROR_OK;
 
+	/* Code specific to JTAG & SWD */
+	if (!(transport_is_jtag() || transport_is_swd()))
+		return ERROR_OK;
+
 	if (!adapter_driver) {
 		/* nothing was previously specified by "adapter driver" command */
 		LOG_ERROR("Debug Adapter has to be specified, "

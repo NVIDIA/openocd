@@ -490,7 +490,7 @@ static int armv7a_setup_semihosting(struct target *target, int enable)
 	uint32_t vcr;
 	int ret;
 
-	ret = mem_ap_read_atomic_u32(armv7a->debug_ap,
+	ret = mem_ap_read_atomic_u32(armv7a->arm.debug_ap,
 					 armv7a->debug_base + CPUDBG_VCR,
 					 &vcr);
 	if (ret < 0) {
@@ -503,7 +503,7 @@ static int armv7a_setup_semihosting(struct target *target, int enable)
 	else
 		vcr &= ~DBG_VCR_SVC_MASK;
 
-	ret = mem_ap_write_atomic_u32(armv7a->debug_ap,
+	ret = mem_ap_write_atomic_u32(armv7a->arm.debug_ap,
 					  armv7a->debug_base + CPUDBG_VCR,
 					  vcr);
 	if (ret < 0)

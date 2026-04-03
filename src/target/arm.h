@@ -232,11 +232,8 @@ struct arm {
 
 	void *arch_info;
 
-	/** For targets conforming to ARM Debug Interface v5,
-	 * this handle references the Debug Access Port (DAP)
-	 * used to make requests to the target.
-	 */
-	struct adiv5_dap *dap;
+	/* AP this processor is connected to */
+	struct mem_ap *debug_ap;
 };
 
 /** Convert target handle to generic ARM target state handle. */
@@ -309,5 +306,13 @@ int arm_blank_check_memory(struct target *target,
 void arm_set_cpsr(struct arm *arm, uint32_t cpsr);
 struct reg *arm_reg_current(struct arm *arm, unsigned regnum);
 struct reg *armv8_reg_current(struct arm *arm, unsigned regnum);
+
+/* This API is here to replace the old arm.dap object. BEWARE it
+ * will return NULL if the target does not use an adiv5 DAP, that should be
+ * handled aproprietly.
+ * It is recommended that you use the mem_ap interface instead whenever
+ * possible.
+ */
+struct adiv5_dap *arm_get_adiv5_dap(struct arm *arm_target);
 
 #endif /* OPENOCD_TARGET_ARM_H */

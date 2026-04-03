@@ -56,17 +56,17 @@ enum arm_state armv8_dpm_get_core_state(struct arm_dpm *dpm)
 
 static int dpmv8_write_dcc(struct armv8_common *armv8, uint32_t data)
 {
-	return mem_ap_write_u32(armv8->debug_ap,
+	return mem_ap_write_u32(armv8->arm.debug_ap,
 				armv8->debug_base + CPUV8_DBG_DTRRX, data);
 }
 
 static int dpmv8_write_dcc_64(struct armv8_common *armv8, uint64_t data)
 {
 	int ret;
-	ret = mem_ap_write_u32(armv8->debug_ap,
+	ret = mem_ap_write_u32(armv8->arm.debug_ap,
 			       armv8->debug_base + CPUV8_DBG_DTRRX, data);
 	if (ret == ERROR_OK)
-		ret = mem_ap_write_u32(armv8->debug_ap,
+		ret = mem_ap_write_u32(armv8->arm.debug_ap,
 				armv8->debug_base + CPUV8_DBG_DTRTX, data >> 32);
 	return ret;
 }
@@ -83,7 +83,7 @@ static int dpmv8_read_dcc(struct armv8_common *armv8, uint32_t *data,
 	/* Wait for DTRRXfull */
 	long long then = timeval_ms();
 	while ((dscr & DSCR_DTR_TX_FULL) == 0) {
-		retval = mem_ap_read_atomic_u32(armv8->debug_ap,
+		retval = mem_ap_read_atomic_u32(armv8->arm.debug_ap,
 				armv8->debug_base + CPUV8_DBG_DSCR,
 				&dscr);
 		if (retval != ERROR_OK)
@@ -94,7 +94,7 @@ static int dpmv8_read_dcc(struct armv8_common *armv8, uint32_t *data,
 		}
 	}
 
-	retval = mem_ap_read_atomic_u32(armv8->debug_ap,
+	retval = mem_ap_read_atomic_u32(armv8->arm.debug_ap,
 					    armv8->debug_base + CPUV8_DBG_DTRTX,
 					    data);
 	if (retval != ERROR_OK)
@@ -119,7 +119,7 @@ static int dpmv8_read_dcc_64(struct armv8_common *armv8, uint64_t *data,
 	/* Wait for DTRRXfull */
 	long long then = timeval_ms();
 	while ((dscr & DSCR_DTR_TX_FULL) == 0) {
-		retval = mem_ap_read_atomic_u32(armv8->debug_ap,
+		retval = mem_ap_read_atomic_u32(armv8->arm.debug_ap,
 				armv8->debug_base + CPUV8_DBG_DSCR,
 				&dscr);
 		if (retval != ERROR_OK)
@@ -130,13 +130,13 @@ static int dpmv8_read_dcc_64(struct armv8_common *armv8, uint64_t *data,
 		}
 	}
 
-	retval = mem_ap_read_atomic_u32(armv8->debug_ap,
+	retval = mem_ap_read_atomic_u32(armv8->arm.debug_ap,
 					    armv8->debug_base + CPUV8_DBG_DTRTX,
 					    (uint32_t *)data);
 	if (retval != ERROR_OK)
 		return retval;
 
-	retval = mem_ap_read_atomic_u32(armv8->debug_ap,
+	retval = mem_ap_read_atomic_u32(armv8->arm.debug_ap,
 					    armv8->debug_base + CPUV8_DBG_DTRRX,
 					    &higher);
 	if (retval != ERROR_OK)
@@ -159,7 +159,7 @@ static int dpmv8_dpm_prepare(struct arm_dpm *dpm)
 	/* set up invariant:  ITE is set after ever DPM operation */
 	long long then = timeval_ms();
 	for (;; ) {
-		retval = mem_ap_read_atomic_u32(armv8->debug_ap,
+		retval = mem_ap_read_atomic_u32(armv8->arm.debug_ap,
 				armv8->debug_base + CPUV8_DBG_DSCR,
 				&dscr);
 		if (retval != ERROR_OK)
@@ -179,7 +179,7 @@ static int dpmv8_dpm_prepare(struct arm_dpm *dpm)
 	if (dscr & DSCR_DTR_RX_FULL) {
 		LOG_ERROR("DSCR_DTR_RX_FULL, dscr 0x%08" PRIx32, dscr);
 		/* Clear DCCRX */
-		retval = mem_ap_read_u32(armv8->debug_ap,
+		retval = mem_ap_read_atomic_u32(armv8->arm.debug_ap,
 			armv8->debug_base + CPUV8_DBG_DTRRX, &dscr);
 		if (retval != ERROR_OK)
 			return retval;
@@ -207,7 +207,7 @@ static int dpmv8_exec_opcode(struct arm_dpm *dpm,
 	/* Wait for InstrCompl bit to be set */
 	long long then = timeval_ms();
 	while ((dscr & DSCR_ITE) == 0) {
-		retval = mem_ap_read_atomic_u32(armv8->debug_ap,
+		retval = mem_ap_read_atomic_u32(armv8->arm.debug_ap,
 				armv8->debug_base + CPUV8_DBG_DSCR, &dscr);
 		if (retval != ERROR_OK) {
 			LOG_ERROR("Could not read DSCR register, opcode = 0x%08" PRIx32, opcode);
@@ -222,14 +222,14 @@ static int dpmv8_exec_opcode(struct arm_dpm *dpm,
 	if (armv8_dpm_get_core_state(dpm) != ARM_STATE_AARCH64)
 		opcode = T32_FMTITR(opcode);
 
-	retval = mem_ap_write_u32(armv8->debug_ap,
+	retval = mem_ap_write_u32(armv8->arm.debug_ap,
 			armv8->debug_base + CPUV8_DBG_ITR, opcode);
 	if (retval != ERROR_OK)
 		return retval;
 
 	then = timeval_ms();
 	do {
-		retval = mem_ap_read_atomic_u32(armv8->debug_ap,
+		retval = mem_ap_read_atomic_u32(armv8->arm.debug_ap,
 				armv8->debug_base + CPUV8_DBG_DSCR, &dscr);
 		if (retval != ERROR_OK) {
 			LOG_ERROR("Could not read DSCR register");
@@ -444,10 +444,10 @@ static int dpmv8_bpwp_enable(struct arm_dpm *dpm, unsigned index_t,
 	LOG_DEBUG("A8: bpwp enable, vr %08x cr %08x",
 		(unsigned) vr, (unsigned) cr);
 
-	retval = mem_ap_write_atomic_u32(armv8->debug_ap, vr, addr);
+	retval = mem_ap_write_atomic_u32(armv8->arm.debug_ap, vr, addr);
 	if (retval != ERROR_OK)
 		return retval;
-	return mem_ap_write_atomic_u32(armv8->debug_ap, cr, control);
+	return mem_ap_write_atomic_u32(armv8->arm.debug_ap, cr, control);
 }
 #endif
 
@@ -472,7 +472,7 @@ static int dpmv8_bpwp_disable(struct arm_dpm *dpm, unsigned index_t)
 	LOG_DEBUG("A: bpwp disable, cr %08x", (unsigned) cr);
 
 	/* clear control register */
-	return mem_ap_write_atomic_u32(armv8->debug_ap, cr, 0);
+	return mem_ap_write_atomic_u32(armv8->arm.debug_ap, cr, 0);
 }
 
 /*
@@ -1307,7 +1307,7 @@ void armv8_dpm_handle_exception(struct arm_dpm *dpm, bool do_restore)
 	}
 
 	/* Clear sticky error */
-	mem_ap_write_u32(armv8->debug_ap,
+	mem_ap_write_u32(armv8->arm.debug_ap,
 		armv8->debug_base + CPUV8_DBG_DRCR, DRCR_CSE);
 
 	armv8->read_reg_u64(armv8, ARMV8_XPSR, &dlr);

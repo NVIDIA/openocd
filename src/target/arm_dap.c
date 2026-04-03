@@ -17,6 +17,7 @@
 #include "helper/command.h"
 #include "transport/transport.h"
 #include "jtag/interface.h"
+#include "target/mem_ap.h"
 
 static LIST_HEAD(all_dap);
 
@@ -40,7 +41,7 @@ static void dap_instance_init(struct adiv5_dap *dap)
 		dap->ap[i].dap = dap;
 		dap->ap[i].ap_num = DP_APSEL_INVALID;
 		/* memaccess_tck max is 255 */
-		dap->ap[i].memaccess_tck = 255;
+		dap->ap[i].memaccess_tck = ADIV5_MEMACCESS_TCK_DEFAULT;
 		/* Number of bits for tar autoincrement, impl. dep. at least 10 */
 		dap->ap[i].tar_autoincr_block = (1<<10);
 		/* default CSW value */
@@ -69,6 +70,16 @@ struct adiv5_dap *adiv5_get_dap(struct arm_dap_object *obj)
 {
 	return &obj->dap;
 }
+
+struct adiv5_dap *arm_get_adiv5_dap(struct arm *arm_target)
+{
+	if (arm_target->debug_ap == NULL)
+		return NULL;
+	if (mem_ap_get_type(arm_target->debug_ap) != MEM_AP_TYPE_ADIV5)
+		return NULL;
+	return (struct adiv5_dap *)mem_ap_get_type_obj(arm_target->debug_ap);
+}
+
 struct adiv5_dap *dap_instance_by_jim_obj(Jim_Interp *interp, Jim_Obj *o)
 {
 	struct arm_dap_object *obj = NULL;
@@ -446,7 +457,7 @@ COMMAND_HANDLER(handle_dap_info_command)
 {
 	struct target *target = get_current_target(CMD_CTX);
 	struct arm *arm = target_to_arm(target);
-	struct adiv5_dap *dap = arm->dap;
+	struct adiv5_dap *dap = arm_get_adiv5_dap(arm);
 	uint64_t apsel;
 
 	if (!dap) {

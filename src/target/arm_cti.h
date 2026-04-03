@@ -8,6 +8,10 @@
 #ifndef OPENOCD_TARGET_ARM_CTI_H
 #define OPENOCD_TARGET_ARM_CTI_H
 
+#include <jim.h>
+#include <stdbool.h>
+#include "helper/command.h"
+
 /*define CTI(cross trigger interface)*/
 #define CTI_CTR				0x0
 #define CTI_INACK			0x10
@@ -48,7 +52,6 @@
 
 /* forward-declare arm_cti struct */
 struct arm_cti;
-struct adiv5_ap;
 
 extern const char *arm_cti_name(struct arm_cti *self);
 extern struct arm_cti *cti_instance_by_jim_obj(Jim_Interp *interp, Jim_Obj *o);

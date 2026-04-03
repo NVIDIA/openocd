@@ -725,9 +725,7 @@ COMMAND_HANDLER(rsl10_unlock_command)
 
 	struct target *target            = get_current_target(CMD_CTX);
 	struct cortex_m_common *cortex_m = target_to_cm(target);
-
-	struct adiv5_dap *dap = cortex_m->armv7m.arm.dap;
-	struct adiv5_ap *ap   = dap_get_ap(dap, 0);
+	struct mem_ap *ap   = cortex_m->armv7m.arm.debug_ap;
 
 	uint32_t user_key[4];
 	COMMAND_PARSE_NUMBER(u32, CMD_ARGV[0], user_key[0]);
@@ -739,11 +737,8 @@ COMMAND_HANDLER(rsl10_unlock_command)
 	target_buffer_set_u32_array(target, write_buffer1, 4, user_key);
 	int retval = mem_ap_write_buf(ap, write_buffer1, 4, 4, RSL10_FLASH_REG_DEBUG_UNLOCK_KEY1);
 	if (retval != ERROR_OK) {
-		dap_put_ap(ap);
 		return retval;
 	}
-
-	dap_put_ap(ap);
 
 	uint32_t key;
 	retval = mem_ap_read_atomic_u32(ap, RSL10_FLASH_ADDRESS_LOCK_INFO_SETTING, &key);

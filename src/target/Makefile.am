@@ -258,6 +258,7 @@ ARC_SRC = \
 	%D%/esirisc_trace.h \
 	%D%/arc.h \
 	%D%/arc_cmd.h \
+	%D%/mem_ap.h \
 	%D%/arc_jtag.h \
 	%D%/arc_mem.h \
 	%D%/rtt.h

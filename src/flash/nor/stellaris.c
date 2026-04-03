@@ -1327,6 +1327,7 @@ COMMAND_HANDLER(stellaris_handle_recover_command)
 {
 	struct flash_bank *bank;
 	struct arm *arm;
+	struct adiv5_dap *dap;
 	int retval;
 
 	if (CMD_ARGC != 0)
@@ -1356,12 +1357,14 @@ COMMAND_HANDLER(stellaris_handle_recover_command)
 	adapter_assert_reset();
 
 	arm = target_to_arm(bank->target);
+	dap = arm_get_adiv5_dap(arm);
+	assert(dap != NULL);
 	for (int i = 0; i < 5; i++) {
-		retval = dap_to_swd(arm->dap);
+		retval = dap_to_swd(dap);
 		if (retval != ERROR_OK)
 			goto done;
 
-		retval = dap_to_jtag(arm->dap);
+		retval = dap_to_jtag(dap);
 		if (retval != ERROR_OK)
 			goto done;
 	}

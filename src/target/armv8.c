@@ -1040,7 +1040,7 @@ COMMAND_HANDLER(armv8_handle_exception_catch_command)
 	if (CMD_ARGC == 0) {
 		const char *sec = NULL, *nsec = NULL;
 
-		retval = mem_ap_read_atomic_u32(armv8->debug_ap,
+		retval = mem_ap_read_atomic_u32(armv8->arm.debug_ap,
 					armv8->debug_base + CPUV8_DBG_ECCR, &edeccr);
 		if (retval != ERROR_OK)
 			return retval;
@@ -1075,7 +1075,7 @@ COMMAND_HANDLER(armv8_handle_exception_catch_command)
 		argp++;
 	}
 
-	retval = mem_ap_write_atomic_u32(armv8->debug_ap,
+	retval = mem_ap_write_atomic_u32(armv8->arm.debug_ap,
 				armv8->debug_base + CPUV8_DBG_ECCR, edeccr);
 	if (retval != ERROR_OK)
 		return retval;
@@ -1401,25 +1401,25 @@ static const struct {
 	{ ARMV8_FPSR, "fpsr", 32, ARM_MODE_ANY, REG_TYPE_UINT32, "simdfp", "org.gnu.gdb.aarch64.fpu", NULL},
 	{ ARMV8_FPCR, "fpcr", 32, ARM_MODE_ANY, REG_TYPE_UINT32, "simdfp", "org.gnu.gdb.aarch64.fpu", NULL},
 
-	{ ARMV8_ELR_EL1, "ELR_EL1", 64, ARMV8_64_EL1H, REG_TYPE_CODE_PTR, "banked", "net.sourceforge.openocd.banked",
+	{ ARMV8_ELR_EL1, "elr_el1", 64, ARMV8_64_EL1H, REG_TYPE_CODE_PTR, "banked", "net.sourceforge.openocd.banked",
 														NULL},
-	{ ARMV8_ESR_EL1, "ESR_EL1", 32, ARMV8_64_EL1H, REG_TYPE_UINT32, "banked", "net.sourceforge.openocd.banked",
+	{ ARMV8_ESR_EL1, "esr_el1", 32, ARMV8_64_EL1H, REG_TYPE_UINT32, "banked", "net.sourceforge.openocd.banked",
 														NULL},
-	{ ARMV8_SPSR_EL1, "SPSR_EL1", 32, ARMV8_64_EL1H, REG_TYPE_UINT32, "banked", "net.sourceforge.openocd.banked",
-														NULL},
-
-	{ ARMV8_ELR_EL2, "ELR_EL2", 64, ARMV8_64_EL2H, REG_TYPE_CODE_PTR, "banked", "net.sourceforge.openocd.banked",
-														NULL},
-	{ ARMV8_ESR_EL2, "ESR_EL2", 32, ARMV8_64_EL2H, REG_TYPE_UINT32, "banked", "net.sourceforge.openocd.banked",
-														NULL},
-	{ ARMV8_SPSR_EL2, "SPSR_EL2", 32, ARMV8_64_EL2H, REG_TYPE_UINT32, "banked", "net.sourceforge.openocd.banked",
+	{ ARMV8_SPSR_EL1, "spsr_el1", 32, ARMV8_64_EL1H, REG_TYPE_UINT32, "banked", "net.sourceforge.openocd.banked",
 														NULL},
 
-	{ ARMV8_ELR_EL3, "ELR_EL3", 64, ARMV8_64_EL3H, REG_TYPE_CODE_PTR, "banked", "net.sourceforge.openocd.banked",
+	{ ARMV8_ELR_EL2, "elr_el2", 64, ARMV8_64_EL2H, REG_TYPE_CODE_PTR, "banked", "net.sourceforge.openocd.banked",
 														NULL},
-	{ ARMV8_ESR_EL3, "ESR_EL3", 32, ARMV8_64_EL3H, REG_TYPE_UINT32, "banked", "net.sourceforge.openocd.banked",
+	{ ARMV8_ESR_EL2, "esr_el2", 32, ARMV8_64_EL2H, REG_TYPE_UINT32, "banked", "net.sourceforge.openocd.banked",
 														NULL},
-	{ ARMV8_SPSR_EL3, "SPSR_EL3", 32, ARMV8_64_EL3H, REG_TYPE_UINT32, "banked", "net.sourceforge.openocd.banked",
+	{ ARMV8_SPSR_EL2, "spsr_el2", 32, ARMV8_64_EL2H, REG_TYPE_UINT32, "banked", "net.sourceforge.openocd.banked",
+														NULL},
+
+	{ ARMV8_ELR_EL3, "elr_el3", 64, ARMV8_64_EL3H, REG_TYPE_CODE_PTR, "banked", "net.sourceforge.openocd.banked",
+														NULL},
+	{ ARMV8_ESR_EL3, "esr_el3", 32, ARMV8_64_EL3H, REG_TYPE_UINT32, "banked", "net.sourceforge.openocd.banked",
+														NULL},
+	{ ARMV8_SPSR_EL3, "spsr_el3", 32, ARMV8_64_EL3H, REG_TYPE_UINT32, "banked", "net.sourceforge.openocd.banked",
 														NULL},
 };
 
@@ -1821,7 +1821,7 @@ int armv8_set_dbgreg_bits(struct armv8_common *armv8, unsigned int reg, unsigned
 	uint32_t tmp;
 
 	/* Read register */
-	int retval = mem_ap_read_atomic_u32(armv8->debug_ap,
+	int retval = mem_ap_read_atomic_u32(armv8->arm.debug_ap,
 			armv8->debug_base + reg, &tmp);
 	if (retval != ERROR_OK)
 		return retval;
@@ -1832,7 +1832,7 @@ int armv8_set_dbgreg_bits(struct armv8_common *armv8, unsigned int reg, unsigned
 	tmp |= value & mask;
 
 	/* write new value */
-	retval = mem_ap_write_atomic_u32(armv8->debug_ap,
+	retval = mem_ap_write_atomic_u32(armv8->arm.debug_ap,
 			armv8->debug_base + reg, tmp);
 	return retval;
 }

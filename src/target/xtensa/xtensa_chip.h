@@ -11,6 +11,7 @@
 #include <target/target.h>
 #include "xtensa.h"
 #include "xtensa_debug_module.h"
+#include "target/mem_ap.h"
 
 struct xtensa_chip_common {
 	struct xtensa xtensa;

@@ -8,6 +8,9 @@
  *   spen@spen-soft.co.uk                                                  *
  *                                                                         *
  *   Copyright (C) 2019-2021, Ampere Computing LLC                         *
+ *                                                                         *
+ *   Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES                    *
+ *   Remi Machet - rmachet@nvidia.com                                      *
  ***************************************************************************/
 
 #ifndef OPENOCD_TARGET_ARM_ADI_V5_H
@@ -224,6 +227,9 @@
 )
 
 #define AP_TYPE_MASK (AP_REG_IDR_DESIGNER_MASK | AP_REG_IDR_CLASS_MASK | AP_REG_IDR_TYPE_MASK)
+
+/* The value is historic and risky to change */
+#define ADIV5_MEMACCESS_TCK_DEFAULT 255
 
 /* FIXME: not SWD specific; should be renamed, e.g. adiv5_special_seq */
 enum swd_special_seq {
@@ -656,34 +662,22 @@ static inline int dap_dp_poll_register(struct adiv5_dap *dap, unsigned reg,
 	}
 }
 
-/* Queued MEM-AP memory mapped single word transfers. */
-int mem_ap_read_u32(struct adiv5_ap *ap,
-		target_addr_t address, uint32_t *value);
-int mem_ap_write_u32(struct adiv5_ap *ap,
-		target_addr_t address, uint32_t value);
+/* MEM-AP memory mapped single word transfers. */
+int adiv5_mem_ap_read_u32(struct adiv5_ap *ap,
+		target_addr_t address, uint32_t *value, bool atomic);
+int adiv5_mem_ap_write_u32(struct adiv5_ap *ap,
+		target_addr_t address, uint32_t value, bool atomic);
 
-/* Synchronous MEM-AP memory mapped single word transfers. */
-int mem_ap_read_atomic_u32(struct adiv5_ap *ap,
-		target_addr_t address, uint32_t *value);
-int mem_ap_write_atomic_u32(struct adiv5_ap *ap,
-		target_addr_t address, uint32_t value);
-
-/* Synchronous MEM-AP memory mapped bus block transfers. */
-int mem_ap_read_buf(struct adiv5_ap *ap,
-		uint8_t *buffer, uint32_t size, uint32_t count, target_addr_t address);
-int mem_ap_write_buf(struct adiv5_ap *ap,
-		const uint8_t *buffer, uint32_t size, uint32_t count, target_addr_t address);
-
-/* Synchronous, non-incrementing buffer functions for accessing fifos. */
-int mem_ap_read_buf_noincr(struct adiv5_ap *ap,
-		uint8_t *buffer, uint32_t size, uint32_t count, target_addr_t address);
-int mem_ap_write_buf_noincr(struct adiv5_ap *ap,
-		const uint8_t *buffer, uint32_t size, uint32_t count, target_addr_t address);
+/* MEM-AP memory mapped bus block transfers. */
+int adiv5_mem_ap_read(struct adiv5_ap *ap, uint8_t *buffer, uint32_t size, uint32_t count,
+		target_addr_t adr, bool addrinc);
+int adiv5_mem_ap_write(struct adiv5_ap *ap, const uint8_t *buffer, uint32_t size, uint32_t count,
+		target_addr_t address, bool addrinc);
 
 /* Initialisation of the debug system, power domains and registers */
 int dap_dp_init(struct adiv5_dap *dap);
 int dap_dp_init_or_reconnect(struct adiv5_dap *dap);
-int mem_ap_init(struct adiv5_ap *ap);
+int adiv5_mem_ap_init(struct adiv5_ap *ap);
 
 /* Invalidate cached DP select and cached TAR and CSW of all APs */
 void dap_invalidate_cache(struct adiv5_dap *dap);
@@ -745,15 +739,5 @@ struct adiv5_private_config {
 
 extern int adiv5_verify_config(struct adiv5_private_config *pc);
 extern int adiv5_jim_configure(struct target *target, struct jim_getopt_info *goi);
-
-struct adiv5_mem_ap_spot {
-	struct adiv5_dap *dap;
-	uint64_t ap_num;
-	uint32_t base;
-};
-
-extern int adiv5_mem_ap_spot_init(struct adiv5_mem_ap_spot *p);
-extern int adiv5_jim_mem_ap_spot_configure(struct adiv5_mem_ap_spot *cfg,
-		struct jim_getopt_info *goi);
 
 #endif /* OPENOCD_TARGET_ARM_ADI_V5_H */

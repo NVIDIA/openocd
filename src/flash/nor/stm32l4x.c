@@ -1642,7 +1642,9 @@ static int stm32l4_read_idcode(struct flash_bank *bank, uint32_t *id)
 	/* CPU2 (Cortex-M0+) is supported only with non-hla adapters because it is on AP1.
 	 * Using HLA adapters armv7m.debug_ap is null, and checking ap_num triggers a segfault */
 	if (cortex_m_get_partno_safe(target) == CORTEX_M0P_PARTNO &&
-			armv7m->debug_ap && armv7m->debug_ap->ap_num == 1) {
+			armv7m->arm.debug_ap &&
+			(mem_ap_get_type(armv7m->arm.debug_ap) == MEM_AP_TYPE_ADIV5) &&
+			(((struct adiv5_ap *)mem_ap_get_type_obj(armv7m->arm.debug_ap))->ap_num == 1)) {
 		uint32_t uid64_ids;
 
 		/* UID64 is contains
@@ -1963,8 +1965,10 @@ static int stm32l4_probe(struct flash_bank *bank)
 		stm32l4_info->bank1_sectors = num_pages;
 
 		/* CPU2 (Cortex-M0+) is supported only with non-hla adapters because it is on AP1.
-		 * Using HLA adapters armv7m->debug_ap is null, and checking ap_num triggers a segfault */
-		if (armv7m->debug_ap && armv7m->debug_ap->ap_num == 1)
+		 * Using HLA adapters armv7m->arm.debug_ap is null, and checking ap_num triggers a segfault */
+		if(armv7m->arm.debug_ap &&
+			(mem_ap_get_type(armv7m->arm.debug_ap) == MEM_AP_TYPE_ADIV5) &&
+			(((struct adiv5_ap *)mem_ap_get_type_obj(armv7m->arm.debug_ap))->ap_num == 1))
 			stm32l4_info->flash_regs = stm32wl_cpu2_flash_regs;
 		break;
 	default:

@@ -935,17 +935,17 @@ static int handle_reset_halt(struct target *target)
 	if (is_cm0) {
 		/* Reset the CM0 by asserting SYSRESETREQ. This will also reset CM4 */
 		LOG_INFO("psoc6.cm0: bkpt @0x%08" PRIX32 ", issuing SYSRESETREQ", reset_addr);
-		mem_ap_write_atomic_u32(cm->debug_ap, NVIC_AIRCR,
+		mem_ap_write_atomic_u32(cm->arm.debug_ap, NVIC_AIRCR,
 			AIRCR_VECTKEY | AIRCR_SYSRESETREQ);
 	} else {
 		LOG_INFO("psoc6.cm4: bkpt @0x%08" PRIX32 ", issuing VECTRESET", reset_addr);
-		mem_ap_write_atomic_u32(cm->debug_ap, NVIC_AIRCR,
+		mem_ap_write_atomic_u32(cm->arm.debug_ap, NVIC_AIRCR,
 			AIRCR_VECTKEY | AIRCR_VECTRESET);
 	}
 
 	/* Wait 100ms for bootcode and reinitialize DAP */
 	usleep(100000);
-	dap_dp_init(cm->debug_ap->dap);
+	mem_ap_reconnect(cm->arm.debug_ap);
 
 	target_wait_state(target, TARGET_HALTED, IPC_TIMEOUT_MS);
 

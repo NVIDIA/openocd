@@ -235,7 +235,7 @@ static int adapter_debug_entry(struct target *target)
 	int retval;
 
 	/* preserve the DCRDR across halts */
-	retval = target_read_u32(target, DCB_DCRDR, &target->SAVED_DCRDR);
+	retval = target_read_u32(target, DCB_DCRDR, (uint32_t *)&target->SAVED_DCRDR);
 	if (retval != ERROR_OK)
 		return retval;
 
@@ -629,11 +629,6 @@ static const struct command_registration hla_command_handlers[] = {
 	{
 		.chain = rtt_target_command_handlers,
 	},
-	/* START_DEPRECATED_TPIU */
-	{
-		.chain = arm_tpiu_deprecated_command_handlers,
-	},
-	/* END_DEPRECATED_TPIU */
 	COMMAND_REGISTRATION_DONE
 };
 

@@ -7,12 +7,12 @@
 #ifndef OPENOCD_TARGET_ARMV8_H
 #define OPENOCD_TARGET_ARMV8_H
 
-#include "arm_adi_v5.h"
 #include "arm.h"
 #include "armv4_5_mmu.h"
 #include "armv4_5_cache.h"
 #include "armv8_dpm.h"
 #include "arm_cti.h"
+#include "mem_ap.h"
 
 enum {
 	ARMV8_R0 = 0,
@@ -186,7 +186,6 @@ struct armv8_common {
 	/* Core Debug Unit */
 	struct arm_dpm dpm;
 	target_addr_t debug_base;
-	struct adiv5_ap *debug_ap;
 
 	const uint32_t *opcodes;
 

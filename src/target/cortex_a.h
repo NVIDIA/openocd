@@ -18,6 +18,7 @@
 #define OPENOCD_TARGET_CORTEX_A_H
 
 #include "armv7a.h"
+#include "arm_adi_v5.h"
 
 #define CORTEX_A_COMMON_MAGIC 0x411fc082U
 

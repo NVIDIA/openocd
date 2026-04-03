@@ -16,8 +16,7 @@
 
 #include "arm.h"
 #include "armv7m_trace.h"
-
-struct adiv5_ap;
+#include "mem_ap.h"
 
 extern const int armv7m_psp_reg_map[];
 extern const int armv7m_msp_reg_map[];
@@ -223,9 +222,6 @@ struct armv7m_common {
 	struct arm arm;
 
 	int exception_number;
-
-	/* AP this processor is connected to in the DAP */
-	struct adiv5_ap *debug_ap;
 
 	int fp_feature;
 	uint32_t demcr;

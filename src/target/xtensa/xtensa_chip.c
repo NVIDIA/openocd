@@ -16,6 +16,10 @@
 #include <rtos/rtos.h>
 #include "xtensa_chip.h"
 
+struct xtensa_private_config {
+	struct mem_ap_private_config *mem_ap_pc;
+};
+
 int xtensa_chip_init_arch_info(struct target *target, void *arch_info,
 	struct xtensa_debug_module_config *dm_cfg)
 {
@@ -83,18 +87,17 @@ static int xtensa_chip_target_create(struct target *target, Jim_Interp *interp)
 		.tap = NULL,
 		.queue_tdi_idle = NULL,
 		.queue_tdi_idle_arg = NULL,
-		.dap = NULL,
 		.debug_ap = NULL,
-		.debug_apsel = DP_APSEL_INVALID,
 		.ap_offset = 0,
 	};
 
-	struct adiv5_private_config *pc = target->private_config;
-	if (adiv5_verify_config(pc) == ERROR_OK) {
-		xtensa_chip_dm_cfg.dap = pc->dap;
-		xtensa_chip_dm_cfg.debug_apsel = pc->ap_num;
+	struct xtensa_private_config *pc = target->private_config;
+	struct mem_ap *mem_ap = mem_ap_find(target, &pc->mem_ap_pc,
+																			MEM_AP_BUS_TYPE_UNKNOWN);
+	if (mem_ap) {
+		xtensa_chip_dm_cfg.debug_ap = mem_ap;
 		xtensa_chip_dm_cfg.ap_offset = target->dbgbase;
-		LOG_DEBUG("DAP: ap_num %" PRId64 " DAP %p\n", pc->ap_num, pc->dap);
+		LOG_DEBUG("DAP: using mem_ap %p", mem_ap_get_name(mem_ap));
 	} else {
 		xtensa_chip_dm_cfg.tap = target->tap;
 		LOG_DEBUG("JTAG: %s:%s pos %d", target->tap->chip, target->tap->tapname,
@@ -124,6 +127,7 @@ static void xtensa_chip_target_deinit(struct target *target)
 {
 	struct xtensa *xtensa = target_to_xtensa(target);
 	xtensa_target_deinit(target);
+	free(target->private_config);
 	free(xtensa->xtensa_chip);
 }
 
@@ -138,17 +142,15 @@ static int xtensa_chip_examine(struct target *target)
 
 static int xtensa_chip_jim_configure(struct target *target, struct jim_getopt_info *goi)
 {
-	static bool dap_configured;
-	int ret = adiv5_jim_configure(target, goi);
-	if (ret == JIM_OK) {
-		LOG_DEBUG("xtensa '-dap' target option found");
-		dap_configured = true;
+	struct xtensa_private_config *pc;
+
+	pc = (struct xtensa_private_config *)target->private_config;
+	if (!pc) {
+			pc = calloc(1, sizeof(struct xtensa_private_config));
+			target->private_config = pc;
 	}
-	if (!dap_configured) {
-		LOG_DEBUG("xtensa '-dap' target option not yet found, assuming JTAG...");
-		target->has_dap = false;
-	}
-	return ret;
+
+	return mem_ap_find_configure(goi, &pc->mem_ap_pc);
 }
 
 /** Methods for generic example of Xtensa-based chip-level targets. */

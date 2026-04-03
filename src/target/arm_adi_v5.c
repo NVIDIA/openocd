@@ -16,6 +16,9 @@
  *   andreas.fritiofson@gmail.com                                          *
  *                                                                         *
  *   Copyright (C) 2019-2021, Ampere Computing LLC                         *
+ *                                                                         *
+ *   Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES                    *
+ *   Remi Machet - rmachet@nvidia.com                                      *
  ***************************************************************************/
 
 /**
@@ -217,18 +220,20 @@ static int mem_ap_setup_transfer(struct adiv5_ap *ap, uint32_t csw, target_addr_
 }
 
 /**
- * Asynchronous (queued) read of a word from memory or a system register.
+ * Read of a word from memory or a system register.
  *
  * @param ap The MEM-AP to access.
  * @param address Address of the 32-bit word to read; it must be
  *	readable by the currently selected MEM-AP.
  * @param value points to where the word will be stored when the
  *	transaction queue is flushed (assuming no errors).
+ * @param atomic indicates whether the access should be synchronous
+ *  (done before the function return) or can be done asynchronously.
  *
  * @return ERROR_OK for success.  Otherwise a fault code.
  */
-int mem_ap_read_u32(struct adiv5_ap *ap, target_addr_t address,
-		uint32_t *value)
+int adiv5_mem_ap_read_u32(struct adiv5_ap *ap, target_addr_t address,
+		uint32_t *value, bool atomic)
 {
 	int retval;
 
@@ -241,46 +246,28 @@ int mem_ap_read_u32(struct adiv5_ap *ap, target_addr_t address,
 	if (retval != ERROR_OK)
 		return retval;
 
-	return dap_queue_ap_read(ap, MEM_AP_REG_BD0(ap->dap) | (address & 0xC), value);
-}
-
-/**
- * Synchronous read of a word from memory or a system register.
- * As a side effect, this flushes any queued transactions.
- *
- * @param ap The MEM-AP to access.
- * @param address Address of the 32-bit word to read; it must be
- *	readable by the currently selected MEM-AP.
- * @param value points to where the result will be stored.
- *
- * @return ERROR_OK for success; *value holds the result.
- * Otherwise a fault code.
- */
-int mem_ap_read_atomic_u32(struct adiv5_ap *ap, target_addr_t address,
-		uint32_t *value)
-{
-	int retval;
-
-	retval = mem_ap_read_u32(ap, address, value);
-	if (retval != ERROR_OK)
+	retval = dap_queue_ap_read(ap, MEM_AP_REG_BD0(ap->dap) | (address & 0xC), value);
+	if ((retval != ERROR_OK) || !atomic)
 		return retval;
 
 	return dap_run(ap->dap);
 }
 
 /**
- * Asynchronous (queued) write of a word to memory or a system register.
+ * Write of a word to memory or a system register.
  *
  * @param ap The MEM-AP to access.
  * @param address Address to be written; it must be writable by
  *	the currently selected MEM-AP.
  * @param value Word that will be written to the address when transaction
  *	queue is flushed (assuming no errors).
+ * @param atomic indicates whether the access should be synchronous
+ *  (done before the function return) or can be done asynchronously.
  *
  * @return ERROR_OK for success.  Otherwise a fault code.
  */
-int mem_ap_write_u32(struct adiv5_ap *ap, target_addr_t address,
-		uint32_t value)
+int adiv5_mem_ap_write_u32(struct adiv5_ap *ap, target_addr_t address,
+		uint32_t value, bool atomic)
 {
 	int retval;
 
@@ -293,27 +280,9 @@ int mem_ap_write_u32(struct adiv5_ap *ap, target_addr_t address,
 	if (retval != ERROR_OK)
 		return retval;
 
-	return dap_queue_ap_write(ap, MEM_AP_REG_BD0(ap->dap) | (address & 0xC),
+	retval = dap_queue_ap_write(ap, MEM_AP_REG_BD0(ap->dap) | (address & 0xC),
 			value);
-}
-
-/**
- * Synchronous write of a word to memory or a system register.
- * As a side effect, this flushes any queued transactions.
- *
- * @param ap The MEM-AP to access.
- * @param address Address to be written; it must be writable by
- *	the currently selected MEM-AP.
- * @param value Word that will be written.
- *
- * @return ERROR_OK for success; the data was written.  Otherwise a fault code.
- */
-int mem_ap_write_atomic_u32(struct adiv5_ap *ap, target_addr_t address,
-		uint32_t value)
-{
-	int retval = mem_ap_write_u32(ap, address, value);
-
-	if (retval != ERROR_OK)
+	if ((retval != ERROR_OK) || !atomic)
 		return retval;
 
 	return dap_run(ap->dap);
@@ -331,7 +300,7 @@ int mem_ap_write_atomic_u32(struct adiv5_ap *ap, target_addr_t address,
  *  should normally be true, except when writing to e.g. a FIFO.
  * @return ERROR_OK on success, otherwise an error code.
  */
-static int mem_ap_write(struct adiv5_ap *ap, const uint8_t *buffer, uint32_t size, uint32_t count,
+int adiv5_mem_ap_write(struct adiv5_ap *ap, const uint8_t *buffer, uint32_t size, uint32_t count,
 		target_addr_t address, bool addrinc)
 {
 	struct adiv5_dap *dap = ap->dap;
@@ -481,7 +450,7 @@ static int mem_ap_write(struct adiv5_ap *ap, const uint8_t *buffer, uint32_t siz
  *  should normally be true, except when reading from e.g. a FIFO.
  * @return ERROR_OK on success, otherwise an error code.
  */
-static int mem_ap_read(struct adiv5_ap *ap, uint8_t *buffer, uint32_t size, uint32_t count,
+int adiv5_mem_ap_read(struct adiv5_ap *ap, uint8_t *buffer, uint32_t size, uint32_t count,
 		target_addr_t adr, bool addrinc)
 {
 	struct adiv5_dap *dap = ap->dap;
@@ -619,30 +588,6 @@ static int mem_ap_read(struct adiv5_ap *ap, uint8_t *buffer, uint32_t size, uint
 	return retval;
 }
 
-int mem_ap_read_buf(struct adiv5_ap *ap,
-		uint8_t *buffer, uint32_t size, uint32_t count, target_addr_t address)
-{
-	return mem_ap_read(ap, buffer, size, count, address, true);
-}
-
-int mem_ap_write_buf(struct adiv5_ap *ap,
-		const uint8_t *buffer, uint32_t size, uint32_t count, target_addr_t address)
-{
-	return mem_ap_write(ap, buffer, size, count, address, true);
-}
-
-int mem_ap_read_buf_noincr(struct adiv5_ap *ap,
-		uint8_t *buffer, uint32_t size, uint32_t count, target_addr_t address)
-{
-	return mem_ap_read(ap, buffer, size, count, address, false);
-}
-
-int mem_ap_write_buf_noincr(struct adiv5_ap *ap,
-		const uint8_t *buffer, uint32_t size, uint32_t count, target_addr_t address)
-{
-	return mem_ap_write(ap, buffer, size, count, address, false);
-}
-
 /*--------------------------------------------------------------------------*/
 
 
@@ -675,11 +620,30 @@ void dap_invalidate_cache(struct adiv5_dap *dap)
 int dap_dp_init(struct adiv5_dap *dap)
 {
 	int retval;
+	uint32_t dlpidr, dpidr, dpidr1;
 
 	LOG_DEBUG("%s", adiv5_dap_name(dap));
 
 	dap->do_reconnect = false;
 	dap_invalidate_cache(dap);
+
+	retval = dap_queue_dp_read(dap, DP_DLPIDR, &dlpidr);
+	if (retval != ERROR_OK)
+		return retval;
+
+	retval = dap_queue_dp_read(dap, DP_DPIDR, &dpidr);
+	if (retval != ERROR_OK)
+		return retval;
+
+	retval = dap_queue_dp_read(dap, DP_DPIDR1, &dpidr1);
+	if (retval != ERROR_OK)
+		return retval;
+
+	retval = dap_run(dap);
+	if (retval != ERROR_OK)
+		return retval;
+
+	LOG_DEBUG("%s: DLPIDR 0x%08x DPIDR 0x%08x DPIDR1 0x%08x", adiv5_dap_name(dap), dlpidr, dpidr, dpidr1);
 
 	/*
 	 * Early initialize dap->dp_ctrl_stat.
@@ -691,11 +655,12 @@ int dap_dp_init(struct adiv5_dap *dap)
 	dap->dp_ctrl_stat = CDBGPWRUPREQ | CSYSPWRUPREQ;
 
 	/*
-	 * This write operation clears the sticky error bit in jtag mode only and
+	 * This write operation clears the sticky error bits in jtag mode only and
 	 * is ignored in swd mode. It also powers-up system and debug domains in
 	 * both jtag and swd modes, if not done before.
 	 */
-	retval = dap_queue_dp_write(dap, DP_CTRL_STAT, dap->dp_ctrl_stat | SSTICKYERR);
+	retval = dap_queue_dp_write(dap, DP_CTRL_STAT, dap->dp_ctrl_stat | SSTICKYERR
+																| SSTICKYORUN | SSTICKYCMP);
 	if (retval != ERROR_OK)
 		return retval;
 
@@ -780,7 +745,7 @@ int dap_dp_init_or_reconnect(struct adiv5_dap *dap)
  *
  * @param ap The MEM-AP being initialized.
  */
-int mem_ap_init(struct adiv5_ap *ap)
+int adiv5_mem_ap_init(struct adiv5_ap *ap)
 {
 	/* check that we support packed transfers */
 	uint32_t csw, cfg;
@@ -1121,7 +1086,7 @@ int dap_put_ap(struct adiv5_ap *ap)
 	if (!is_ap_in_use(ap)) {
 		/* defaults from dap_instance_init() */
 		ap->ap_num = DP_APSEL_INVALID;
-		ap->memaccess_tck = 255;
+		ap->memaccess_tck = ADIV5_MEMACCESS_TCK_DEFAULT;
 		ap->tar_autoincr_block = (1 << 10);
 		ap->csw_default = CSW_AHB_DEFAULT;
 		ap->cfg_reg = MEM_AP_REG_CFG_INVALID;
@@ -1233,7 +1198,7 @@ static int dap_queue_read_reg(enum coresight_access_mode mode, struct adiv5_ap *
 		return dap_queue_ap_read(ap, reg, value);
 
 	/* mode == CS_ACCESS_MEM_AP */
-	return mem_ap_read_u32(ap, component_base + reg, value);
+	return adiv5_mem_ap_read_u32(ap, component_base + reg, value, false);
 }
 
 /**
@@ -2343,21 +2308,12 @@ int adiv5_jim_configure(struct target *target, struct jim_getopt_info *goi)
 		target->private_config = pc;
 	}
 
-	target->has_dap = true;
-
 	e = adiv5_jim_spot_configure(goi, &pc->dap, &pc->ap_num, NULL);
 	if (e != JIM_OK)
 		return e;
 
-	if (pc->dap && !target->dap_configured) {
-		if (target->tap_configured) {
-			pc->dap = NULL;
-			Jim_SetResultString(goi->interp,
-				"-chain-position and -dap configparams are mutually exclusive!", -1);
-			return JIM_ERR;
-		}
+	if (pc->dap && !target->tap) {
 		target->tap = pc->dap->tap;
-		target->dap_configured = true;
 	}
 
 	return JIM_OK;
@@ -2374,20 +2330,6 @@ int adiv5_verify_config(struct adiv5_private_config *pc)
 	return ERROR_OK;
 }
 
-int adiv5_jim_mem_ap_spot_configure(struct adiv5_mem_ap_spot *cfg,
-		struct jim_getopt_info *goi)
-{
-	return adiv5_jim_spot_configure(goi, &cfg->dap, &cfg->ap_num, &cfg->base);
-}
-
-int adiv5_mem_ap_spot_init(struct adiv5_mem_ap_spot *p)
-{
-	p->dap = NULL;
-	p->ap_num = DP_APSEL_INVALID;
-	p->base = 0;
-	return ERROR_OK;
-}
-
 COMMAND_HANDLER(handle_dap_info_command)
 {
 	struct adiv5_dap *dap = adiv5_get_dap(CMD_DATA);
@@ -2399,6 +2341,7 @@ COMMAND_HANDLER(handle_dap_info_command)
 		break;
 	case 1:
 		if (!strcmp(CMD_ARGV[0], "root")) {
+			command_print(CMD, "Reading DAP root structure...");
 			if (!is_adiv6(dap)) {
 				command_print(CMD, "Option \"root\" not allowed with ADIv5 DAP");
 				return ERROR_COMMAND_ARGUMENT_INVALID;
@@ -2844,7 +2787,7 @@ const struct command_registration dap_instance_commands[] = {
 		.handler = dap_memaccess_command,
 		.mode = COMMAND_EXEC,
 		.help = "set/get number of extra tck for MEM-AP memory "
-			"bus access [0-255]",
+			"bus access [0-2^32]",
 		.usage = "[cycles]",
 	},
 	{

@@ -15,6 +15,9 @@
  *                                                                         *
  *   Copyright (C) ST-Ericsson SA 2011                                     *
  *   michel.jaouen@stericsson.com : smp minimum support                    *
+ *                                                                         *
+ *   Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES                    *
+ *   Remi Machet - rmachet@nvidia.com                                      *
  ***************************************************************************/
 
 #ifndef OPENOCD_TARGET_TARGET_H
@@ -177,14 +180,10 @@ struct target {
 
 										/* ARM v7/v8 targets with ADIv5 interface */
 	bool dbgbase_set;					/* By default the debug base is not set */
-	uint32_t dbgbase;					/* Really a Cortex-A specific option, but there is no
+	target_addr_t dbgbase;		/* Really a Cortex-A specific option, but there is no
 										 * system in place to support target specific options
 										 * currently. */
-	bool has_dap;						/* set to true if target has ADIv5 support */
-	bool dap_configured;				/* set to true if ADIv5 DAP is configured */
-	bool tap_configured;				/* set to true if JTAG tap has been configured
-										 * through -chain-position */
-
+	bool has_tap;						/* set to true if target uses a tap in which case tap must be set */
 	struct rtos *rtos;					/* Instance of Real Time Operating System support */
 	bool rtos_auto_detect;				/* A flag that indicates that the RTOS has been specified as "auto"
 										 * and must be detected when symbols are offered */
@@ -208,6 +207,9 @@ struct target {
 
 	/* The semihosting information, extracted from the target. */
 	struct semihosting *semihosting;
+
+	/* If set and the target examination fails the target will be removed */
+	bool auto_detect;
 };
 
 struct target_list {
