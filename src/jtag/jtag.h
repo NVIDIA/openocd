@@ -178,6 +178,7 @@ enum jtag_event {
 	JTAG_TAP_EVENT_SETUP,
 	JTAG_TAP_EVENT_ENABLE,
 	JTAG_TAP_EVENT_DISABLE,
+	JTAG_TAP_EVENT_SETUP_ERROR,
 };
 
 struct jtag_tap_event_action {

@@ -44,6 +44,7 @@ static const struct jim_nvp nvp_jtag_tap_event[] = {
 	{ .value = JTAG_TAP_EVENT_SETUP,        .name = "setup" },
 	{ .value = JTAG_TAP_EVENT_ENABLE,       .name = "tap-enable" },
 	{ .value = JTAG_TAP_EVENT_DISABLE,      .name = "tap-disable" },
+	{ .value = JTAG_TAP_EVENT_SETUP_ERROR,  .name = "setup-error" },
 
 	{ .name = NULL, .value = -1 }
 };

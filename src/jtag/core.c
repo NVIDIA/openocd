@@ -13,6 +13,9 @@
  *                                                                         *
  *   Copyright (C) 2005 by Dominic Rath                                    *
  *   Dominic.Rath@gmx.de                                                   *
+ *                                                                         *
+ *   Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES                    *
+ *   Remi Machet <rmachet@nvidia.com>                                      *
  ***************************************************************************/
 
 #ifdef HAVE_CONFIG_H
@@ -68,6 +71,7 @@ static const char *jtag_event_strings[] = {
 	[JTAG_TAP_EVENT_SETUP] = "TAP setup",
 	[JTAG_TAP_EVENT_ENABLE] = "TAP enabled",
 	[JTAG_TAP_EVENT_DISABLE] = "TAP disabled",
+	[JTAG_TAP_EVENT_SETUP_ERROR] = "TAP setup ERROR",
 };
 
 /*
@@ -956,7 +960,7 @@ int default_interface_jtag_execute_queue(void)
 	struct jtag_command *cmd = jtag_command_queue;
 	while (debug_level >= LOG_LVL_DEBUG_IO && cmd) {
 		switch (cmd->type) {
-			case JTAG_SCAN:
+			case JTAG_CMD_SCAN:
 				LOG_DEBUG_IO("JTAG %s SCAN to %s",
 						cmd->cmd.scan->ir_scan ? "IR" : "DR",
 						tap_state_name(cmd->cmd.scan->end_state));
@@ -974,16 +978,16 @@ int default_interface_jtag_execute_queue(void)
 					}
 				}
 				break;
-			case JTAG_TLR_RESET:
+			case JTAG_CMD_TLR_RESET:
 				LOG_DEBUG_IO("JTAG TLR RESET to %s",
 						tap_state_name(cmd->cmd.statemove->end_state));
 				break;
-			case JTAG_RUNTEST:
+			case JTAG_CMD_RUNTEST:
 				LOG_DEBUG_IO("JTAG RUNTEST %d cycles to %s",
 						cmd->cmd.runtest->num_cycles,
 						tap_state_name(cmd->cmd.runtest->end_state));
 				break;
-			case JTAG_RESET:
+			case JTAG_CMD_RESET:
 				{
 					const char *reset_str[3] = {
 						"leave", "deassert", "assert"
@@ -993,16 +997,16 @@ int default_interface_jtag_execute_queue(void)
 							reset_str[cmd->cmd.reset->srst + 1]);
 				}
 				break;
-			case JTAG_PATHMOVE:
+			case JTAG_CMD_PATHMOVE:
 				LOG_DEBUG_IO("JTAG PATHMOVE (TODO)");
 				break;
-			case JTAG_SLEEP:
+			case JTAG_CMD_SLEEP:
 				LOG_DEBUG_IO("JTAG SLEEP (TODO)");
 				break;
-			case JTAG_STABLECLOCKS:
+			case JTAG_CMD_STABLECLOCKS:
 				LOG_DEBUG_IO("JTAG STABLECLOCKS (TODO)");
 				break;
-			case JTAG_TMS:
+			case JTAG_CMD_TMS:
 				LOG_DEBUG_IO("JTAG TMS (TODO)");
 				break;
 			default:
@@ -1284,7 +1288,7 @@ static int jtag_examine_chain(void)
 			LOG_INFO("TAP %s does not have valid IDCODE (idcode=0x%" PRIx32 ")",
 					tap->dotted_name, idcode);
 			tap->hasidcode = false;
-			tap->idcode = 0;
+			tap->idcode = idcode;
 
 			bit_count += 1;
 		} else {
@@ -1573,9 +1577,10 @@ int jtag_init_inner(struct command_context *cmd_ctx)
 
 	if (issue_setup)
 		jtag_notify_event(JTAG_TAP_EVENT_SETUP);
-	else
+	else {
+		jtag_notify_event(JTAG_TAP_EVENT_SETUP_ERROR);
 		LOG_WARNING("Bypassing JTAG setup events due to errors");
-
+	}
 
 	return ERROR_OK;
 }
