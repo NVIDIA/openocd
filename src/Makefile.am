@@ -1,3 +1,4 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: GPL-2.0-or-later
 
 noinst_LTLIBRARIES += %D%/libopenocd.la
@@ -58,6 +59,10 @@ endif
 	%D%/helper/libhelper.la \
 	%D%/rtt/librtt.la
 
+if CSWP
+%C%_libopenocd_la_LIBADD += %D%/cswp/libcswp.la
+endif
+
 BIN2C = $(srcdir)/%D%/helper/bin2char.sh
 
 STARTUP_TCL_SRCS =
@@ -79,6 +84,9 @@ CLEANFILES += %D%/startup_tcl.inc
 
 include %D%/helper/Makefile.am
 include %D%/jtag/Makefile.am
+if CSWP
+include %D%/cswp/Makefile.am
+endif
 include %D%/transport/Makefile.am
 include %D%/xsvf/Makefile.am
 include %D%/svf/Makefile.am

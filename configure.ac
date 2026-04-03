@@ -1,3 +1,4 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: GPL-2.0-or-later
 
 AC_PREREQ([2.69])
@@ -292,6 +293,18 @@ AC_ARG_ENABLE([jtag_dpi],
   AS_HELP_STRING([--enable-jtag_dpi], [Enable building support for JTAG DPI]),
   [build_jtag_dpi=$enableval], [build_jtag_dpi=no])
 
+AC_ARG_ENABLE([jtag_driver],
+  AS_HELP_STRING([--enable-jtag_driver], [Enable building support for JTAG DRIVER]),
+  [build_jtag_driver=$enableval], [build_jtag_driver=yes])
+
+AC_ARG_ENABLE([cswp],
+  AS_HELP_STRING([--enable-cswp], [Enable CSWP support]),
+  [enable_cswp=$enableval], [enable_cswp=no])
+AM_CONDITIONAL([CSWP], [test "x$enable_cswp" = "xyes"])
+if test "x$enable_cswp" = "xyes"; then
+  AC_DEFINE([HAVE_CSWP], [1], [Define if CSWP support is enabled])
+fi
+
 AC_ARG_ENABLE([amtjtagaccel],
   AS_HELP_STRING([--enable-amtjtagaccel], [Enable building the Amontec JTAG-Accelerator driver]),
   [build_amtjtagaccel=$enableval], [build_amtjtagaccel=no])
@@ -554,6 +567,11 @@ AS_IF([test "x$build_jtag_dpi" = "xyes"], [
   AC_DEFINE([BUILD_JTAG_DPI], [0], [0 if you don't want JTAG DPI.])
 ])
 
+AS_IF([test "x$build_jtag_driver" = "xyes"], [
+  AC_DEFINE([BUILD_JTAG_DRIVER], [1], [1 if you want JTAG DRIVER.])
+], [
+  AC_DEFINE([BUILD_JTAG_DRIVER], [0], [0 if you don't want JTAG DRIVER.])
+])
 
 AS_IF([test "x$build_amtjtagaccel" = "xyes"], [
   AC_DEFINE([BUILD_AMTJTAGACCEL], [1], [1 if you want the Amontec JTAG-Accelerator driver.])
@@ -741,6 +759,7 @@ AM_CONDITIONAL([BITBANG], [test "x$build_bitbang" = "xyes"])
 AM_CONDITIONAL([JTAG_VPI], [test "x$build_jtag_vpi" = "xyes"])
 AM_CONDITIONAL([VDEBUG], [test "x$build_vdebug" = "xyes"])
 AM_CONDITIONAL([JTAG_DPI], [test "x$build_jtag_dpi" = "xyes"])
+AM_CONDITIONAL([JTAG_DRIVER], [test "x$build_jtag_driver" = "xyes" -o "x$build_jtag_driver" = "xyes"])
 AM_CONDITIONAL([USB_BLASTER_DRIVER], [test "x$enable_usb_blaster" != "xno" -o "x$enable_usb_blaster_2" != "xno"])
 AM_CONDITIONAL([AMTJTAGACCEL], [test "x$build_amtjtagaccel" = "xyes"])
 AM_CONDITIONAL([GW16012], [test "x$build_gw16012" = "xyes"])
@@ -833,7 +852,9 @@ m4_foreach([adapter], [USB1_ADAPTERS,
 	LIBFTDI_USB1_ADAPTERS,
 	LIBGPIOD_ADAPTERS,
 	LIBJAYLINK_ADAPTERS, PCIE_ADAPTERS, SERIAL_PORT_ADAPTERS,
-	OPTIONAL_LIBRARIES],
+	OPTIONAL_LIBRARIES,
+	[[cswp], [Coresight Wire Protocol support], [CSWP]]
+	],
 	[s=m4_format(["%-40s"], ADAPTER_DESC([adapter]))
 	AS_CASE([$ADAPTER_VAR([adapter])],
 		[auto], [

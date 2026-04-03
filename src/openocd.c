@@ -37,6 +37,10 @@
 #include <strings.h>
 #endif
 
+#ifdef HAVE_CSWP
+#include "cswp/cswp.h"
+#endif
+
 #ifdef PKGBLDDATE
 #define OPENOCD_VERSION	\
 	"Open On-Chip Debugger " VERSION RELSTR " (" PKGBLDDATE ")"
@@ -425,6 +429,7 @@ int openocd_main(int argc, char *argv[])
 
 	adapter_quit();
 
+	transport_cleanup_all();
 	server_host_os_close();
 
 	/* Shutdown commandline interface */
