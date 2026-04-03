@@ -2,6 +2,7 @@
 
 /*
  * Copyright (c) 2010 by David Brownell
+ * Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  */
 
 #ifdef HAVE_CONFIG_H
@@ -160,6 +161,25 @@ struct transport *get_current_transport(void)
 	return session;
 }
 
+/**
+ * Call all transports terminate functions and cleanup all allocated
+ * data.
+ */
+int transport_cleanup_all(void)
+{
+	struct transport *t;
+	int retv = ERROR_OK;
+
+	for (t = transport_list; t; t = t->next) {
+		if (t->terminate != NULL) {
+			int r = t->terminate();
+			if (r != ERROR_OK)
+				retv = r;
+		}
+	}
+	return retv;
+}
+
 /*-----------------------------------------------------------------------*/
 
 /*
@@ -220,12 +240,14 @@ COMMAND_HANDLER(handle_transport_init)
 	if (!session) {
 		LOG_ERROR("session transport was not selected. Use 'transport select <transport>'");
 
-		/* no session transport configured, print transports then fail */
-		LOG_ERROR("Transports available:");
-		const char * const *vector = allowed_transports;
-		while (*vector) {
-			LOG_ERROR("%s", *vector);
-			vector++;
+		if (allowed_transports) {
+			/* no session transport configured, print transports then fail */
+			LOG_ERROR("Transports available:");
+			const char * const *vector = allowed_transports;
+			while (*vector) {
+				LOG_ERROR("%s", *vector);
+				vector++;
+			}
 		}
 		return ERROR_FAIL;
 	}

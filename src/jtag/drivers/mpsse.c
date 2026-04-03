@@ -941,5 +941,7 @@ error_check:
 	if (read_transfer)
 		libusb_free_transfer(read_transfer);
 
+	/* Make sure future calls are aware of this error */
+	ctx->retval = retval;
 	return retval;
 }

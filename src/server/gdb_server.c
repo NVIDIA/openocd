@@ -21,6 +21,9 @@
  *                                                                         *
  *   Copyright (C) 2013 Franck Jullien                                     *
  *   elec4fun@gmail.com                                                    *
+ *                                                                         *
+ *   Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES                    *
+ *   Remi Machet <rmachet@nvidia.com>                                      *
  ***************************************************************************/
 
 #ifdef HAVE_CONFIG_H
@@ -344,7 +347,7 @@ static int gdb_putback_char(struct connection *connection, int last_char)
 /* The only way we can detect that the socket is closed is the first time
  * we write to it, we will fail. Subsequent write operations will
  * succeed. Shudder! */
-static int gdb_write(struct connection *connection, void *data, int len)
+static int gdb_write(struct connection *connection, const void *data, int len)
 {
 	struct gdb_connection *gdb_con = connection->priv;
 	if (gdb_con->closed) {
@@ -391,7 +394,7 @@ static void gdb_log_incoming_packet(struct connection *connection, char *packet)
 	}
 }
 
-static void gdb_log_outgoing_packet(struct connection *connection, char *packet_buf,
+static void gdb_log_outgoing_packet(struct connection *connection, const char *packet_buf,
 	unsigned int packet_len, unsigned char checksum)
 {
 	if (!LOG_LEVEL_IS(LOG_LVL_DEBUG))
@@ -408,7 +411,7 @@ static void gdb_log_outgoing_packet(struct connection *connection, char *packet_
 }
 
 static int gdb_put_packet_inner(struct connection *connection,
-		char *buffer, int len)
+		const char *buffer, int len)
 {
 	int i;
 	unsigned char my_checksum = 0;
@@ -528,7 +531,7 @@ static int gdb_put_packet_inner(struct connection *connection,
 	return ERROR_OK;
 }
 
-int gdb_put_packet(struct connection *connection, char *buffer, int len)
+int gdb_put_packet(struct connection *connection, const char *buffer, int len)
 {
 	struct gdb_connection *gdb_con = connection->priv;
 	gdb_con->busy = true;
@@ -1073,12 +1076,10 @@ static int gdb_new_connection(struct connection *connection)
 			target_name(target),
 			target_state_name(target));
 
-	if (!target_was_examined(target)) {
-		LOG_ERROR("Target %s not examined yet, refuse gdb connection %d!",
-				  target_name(target), gdb_actual_connections);
-		gdb_actual_connections--;
-		return ERROR_TARGET_NOT_EXAMINED;
-	}
+	/* One can still do a lot without a core to look at... */
+	if (!target_was_examined(target))
+		LOG_WARNING("Target %s not examined yet, core control is unlikely to work!",
+				  target_name(target));
 
 	if (target->state != TARGET_HALTED)
 		LOG_WARNING("GDB connection %d on target %s not halted",
@@ -1136,7 +1137,7 @@ static int gdb_connection_closed(struct connection *connection)
 	return ERROR_OK;
 }
 
-static void gdb_send_error(struct connection *connection, uint8_t the_error)
+void gdb_send_error(struct connection *connection, uint8_t the_error)
 {
 	char err[4];
 	snprintf(err, 4, "E%2.2X", the_error);
@@ -2331,12 +2332,9 @@ static int smp_reg_list_noread(struct target *target,
 					if (!strcmp(a->name, b->name)) {
 						found = true;
 						if (a->size != b->size) {
-							LOG_ERROR("SMP register %s is %d bits on one "
-									"target, but %d bits on another target.",
-									a->name, a->size, b->size);
-							free(reg_list);
-							free(local_list);
-							return ERROR_FAIL;
+							LOG_WARNING("SMP register %s is %d bits on %s "
+									"target, but %d bits on %s target.",
+									a->name, a->size, a->name, b->size, b->name);
 						}
 						break;
 					}
@@ -2976,7 +2974,7 @@ static int gdb_query_packet(struct connection *connection,
 	return ERROR_OK;
 }
 
-static bool gdb_handle_vcont_packet(struct connection *connection, const char *packet, int packet_size)
+static bool gdb_handle_vcont_packet(struct connection *connection, const char *packet)
 {
 	struct gdb_connection *gdb_connection = connection->priv;
 	struct target *target = get_target_from_connection(connection);
@@ -2995,7 +2993,6 @@ static bool gdb_handle_vcont_packet(struct connection *connection, const char *p
 
 	if (parse[0] == ';') {
 		++parse;
-		--packet_size;
 	}
 
 	/* simple case, a continue packet */
@@ -3034,14 +3031,11 @@ static bool gdb_handle_vcont_packet(struct connection *connection, const char *p
 		int current_pc = 1;
 		int64_t thread_id;
 		parse++;
-		packet_size--;
 		if (parse[0] == ':') {
 			char *endp;
 			parse++;
-			packet_size--;
 			thread_id = strtoll(parse, &endp, 16);
 			if (endp) {
-				packet_size -= endp - parse;
 				parse = endp;
 			}
 		} else {
@@ -3064,7 +3058,6 @@ static bool gdb_handle_vcont_packet(struct connection *connection, const char *p
 
 		if (parse[0] == ';') {
 			++parse;
-			--packet_size;
 
 			if (parse[0] == 'c') {
 				parse += 1;
@@ -3260,7 +3253,7 @@ static int gdb_v_packet(struct connection *connection,
 		packet += 5;
 		packet_size -= 5;
 
-		handled = gdb_handle_vcont_packet(connection, packet, packet_size);
+		handled = gdb_handle_vcont_packet(connection, packet);
 		if (!handled)
 			gdb_put_packet(connection, "", 0);
 

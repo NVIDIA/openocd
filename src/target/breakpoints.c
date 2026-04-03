@@ -216,9 +216,12 @@ int breakpoint_add(struct target *target,
 
 		foreach_smp_target(head, target->smp_targets) {
 			struct target *curr = head->target;
-			int retval = breakpoint_add_internal(curr, address, length, type);
-			if (retval != ERROR_OK)
-				return retval;
+			/* If a target is not online we cannot set a breakpoint */
+			if (target_was_examined(curr)) {
+				int retval = breakpoint_add_internal(curr, address, length, type);
+				if (retval != ERROR_OK)
+					return retval;
+			}
 		}
 
 		return ERROR_OK;
@@ -237,9 +240,12 @@ int context_breakpoint_add(struct target *target,
 
 		foreach_smp_target(head, target->smp_targets) {
 			struct target *curr = head->target;
-			int retval = context_breakpoint_add_internal(curr, asid, length, type);
-			if (retval != ERROR_OK)
-				return retval;
+			/* If a target is not online we cannot set a breakpoint */
+			if (target_was_examined(curr)) {
+				int retval = context_breakpoint_add_internal(curr, asid, length, type);
+				if (retval != ERROR_OK)
+					return retval;
+			}
 		}
 
 		return ERROR_OK;
@@ -259,9 +265,12 @@ int hybrid_breakpoint_add(struct target *target,
 
 		foreach_smp_target(head, target->smp_targets) {
 			struct target *curr = head->target;
-			int retval = hybrid_breakpoint_add_internal(curr, address, asid, length, type);
-			if (retval != ERROR_OK)
-				return retval;
+			/* If a target is not online we cannot set a breakpoint */
+			if (target_was_examined(curr)) {
+				int retval = hybrid_breakpoint_add_internal(curr, address, asid, length, type);
+				if (retval != ERROR_OK)
+					return retval;
+			}
 		}
 
 		return ERROR_OK;

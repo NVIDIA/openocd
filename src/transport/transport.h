@@ -3,6 +3,7 @@
 /*
  * Copyright (c) 2010 by David Brownell
  * Copyright (C) 2011 Tomasz Boleslaw CEDRO (http://www.tomek.cedro.info)
+ * Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  */
 
 #ifndef OPENOCD_TRANSPORT_TRANSPORT_H
@@ -58,6 +59,12 @@ struct transport {
 	int (*init)(struct command_context *ctx);
 
 	/**
+	 * Called when OpenOCD shuts down or transport is no longer
+	 * needed, all resources should be freed.
+	 */
+	int (*terminate)(void);
+
+	/**
 	 * Optional. If defined, allows transport to override target
 	 * name prior to initialisation.
 	 *
@@ -80,6 +87,7 @@ int transport_register_commands(struct command_context *ctx);
 COMMAND_HELPER(transport_list_parse, char ***vector);
 
 int allow_transports(struct command_context *ctx, const char * const *vector);
+int transport_cleanup_all(void);
 
 bool transport_is_jtag(void);
 bool transport_is_swd(void);
