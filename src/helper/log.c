@@ -9,6 +9,9 @@
  *                                                                         *
  *   Copyright (C) 2008 by Spencer Oliver                                  *
  *   spen@spen-soft.co.uk                                                  *
+ *                                                                         *
+ *   Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES                    *
+ *   Remi Machet <rmachet@nvidia.com>                                      *
  ***************************************************************************/
 
 #ifdef HAVE_CONFIG_H
@@ -37,6 +40,7 @@ static FILE *log_output;
 static struct log_callback *log_callbacks;
 
 static int64_t last_time;
+static int64_t last_hello_time;
 
 static int64_t start;
 
@@ -125,8 +129,10 @@ static void log_puts(enum log_levels level,
 
 	fflush(log_output);
 
-	/* Never forward LOG_LVL_DEBUG, too verbose and they can be found in the log if need be */
-	if (level <= LOG_LVL_INFO)
+	/* Never forward LOG_LVL_DEBUG, too verbose and they can be found in the log
+	   if need be. Same about LOG_LVL_INFO which are state info a GDB user does
+	   not need to know. */
+	if (level < LOG_LVL_INFO)
 		log_forward(file, line, function, string);
 }
 
@@ -283,7 +289,7 @@ void log_init(void)
 	if (!log_output)
 		log_output = stderr;
 
-	start = last_time = timeval_ms();
+	start = last_time = last_hello_time = timeval_ms();
 }
 
 void log_exit(void)
@@ -396,6 +402,7 @@ char *alloc_printf(const char *format, ...)
  */
 #define KEEP_ALIVE_KICK_TIME_MS  500
 #define KEEP_ALIVE_TIMEOUT_MS   1000
+#define KEEP_ALIVE_HELLO_MS   600000
 
 static void gdb_timeout_warning(int64_t delta_time)
 {
@@ -420,11 +427,22 @@ void keep_alive(void)
 {
 	int64_t current_time = timeval_ms();
 	int64_t delta_time = current_time - last_time;
+	int64_t delta_hello_time = current_time - last_hello_time;
 
 	if (delta_time > KEEP_ALIVE_TIMEOUT_MS) {
 		last_time = current_time;
 
 		gdb_timeout_warning(delta_time);
+	}
+
+	/* This message is here to prevent ssh sessions running OOCD from
+	 * closing. We do not use LOG_* because we do not want these
+	 * messages forwarded.
+	 */
+	if (delta_hello_time > KEEP_ALIVE_HELLO_MS) {
+		last_hello_time = current_time;
+
+		printf("OpenOCD running.\n");
 	}
 
 	if (delta_time > KEEP_ALIVE_KICK_TIME_MS) {
@@ -509,7 +527,7 @@ void log_socket_error(const char *socket_desc)
  * Find the first non-printable character in the char buffer, return a pointer to it.
  * If no such character exists, return NULL.
  */
-char *find_nonprint_char(char *buf, unsigned buf_len)
+const char *find_nonprint_char(const char *buf, unsigned buf_len)
 {
 	for (unsigned int i = 0; i < buf_len; i++) {
 		if (!isprint(buf[i]))
