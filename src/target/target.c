@@ -24,6 +24,9 @@
  *                                                                         *
  *   Copyright (C) 2011 Andreas Fritiofson                                 *
  *   andreas.fritiofson@gmail.com                                          *
+ *                                                                         *
+ *   Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES                    *
+ *   Remi Machet <rmachet@nvidia.com>                                      *
  ***************************************************************************/
 
 #ifdef HAVE_CONFIG_H
@@ -47,6 +50,9 @@
 #include "arm_cti.h"
 #include "smp.h"
 #include "semihosting_common.h"
+#ifdef HAVE_CSWP
+#include "cswp/cswp.h"
+#endif
 
 /* default halt wait timeout (ms) */
 #define DEFAULT_HALT_TIMEOUT 5000
@@ -64,6 +70,7 @@ static int target_get_gdb_fileio_info_default(struct target *target,
 		struct gdb_fileio_info *fileio_info);
 static int target_gdb_fileio_end_default(struct target *target, int retcode,
 		int fileio_errno, bool ctrl_c);
+static void target_destroy(struct target *target);
 
 /* targets */
 extern struct target_type arm7tdmi_target;
@@ -536,10 +543,20 @@ struct target *get_target_by_num(int num)
 struct target *get_current_target(struct command_context *cmd_ctx)
 {
 	struct target *target = get_current_target_or_null(cmd_ctx);
+	struct target *t;
 
 	if (!target) {
 		LOG_ERROR("BUG: current_target out of bounds");
 		exit(-1);
+	}
+
+	for (t = all_targets; t; t = t->next)
+		if (t == target)
+			break;
+	if (!t) {
+		LOG_WARNING("the target associated with this command was destroyed, fixing...");
+		target = all_targets;
+		cmd_ctx->current_target = target;
 	}
 
 	return target;
@@ -768,7 +785,7 @@ static int jtag_enable_callback(enum jtag_event event, void *priv)
 {
 	struct target *target = priv;
 
-	if (event != JTAG_TAP_EVENT_ENABLE || !target->tap->enabled)
+	if (event != JTAG_TAP_EVENT_ENABLE || (target->has_tap && !target->tap->enabled))
 		return ERROR_OK;
 
 	jtag_unregister_event_callback(jtag_enable_callback, target);
@@ -784,22 +801,35 @@ static int jtag_enable_callback(enum jtag_event event, void *priv)
 int target_examine(void)
 {
 	int retval = ERROR_OK;
-	struct target *target;
+	struct target *target, *next_target;
 
-	for (target = all_targets; target; target = target->next) {
-		/* defer examination, but don't skip it */
-		if (!target->tap->enabled) {
-			jtag_register_event_callback(jtag_enable_callback,
-					target);
-			continue;
+	for (target = all_targets; target; target = next_target) {
+		/* Save this value here in case target gets freed */
+		next_target = target->next;
+		if(target->has_tap) {
+			/* defer examination, but don't skip it */
+			if (!target->tap->enabled) {
+				jtag_register_event_callback(jtag_enable_callback,
+						target);
+				continue;
+			}
 		}
 
 		if (target->defer_examine)
 			continue;
 
 		int retval2 = target_examine_one(target);
-		if (retval2 != ERROR_OK) {
-			LOG_WARNING("target %s examination failed", target_name(target));
+		if (retval2 == ERROR_WAIT) {
+			LOG_WARNING("target %s not ready yet.", target_name(target));
+		} else if (retval2 != ERROR_OK) {
+			if (target->auto_detect) {
+				LOG_WARNING("target %s examination failed and auto-detection"
+										" is enabled, it will be removed", target_name(target));
+				target_destroy(target);
+				/* WARNING: do not user target past this point */
+			} else {
+				LOG_WARNING("target %s examination failed", target_name(target));
+			}
 			retval = retval2;
 		}
 	}
@@ -1944,13 +1974,13 @@ static int target_call_timer_callbacks_check_time(int checktime)
 	return ERROR_OK;
 }
 
-int target_call_timer_callbacks()
+int target_call_timer_callbacks(void)
 {
 	return target_call_timer_callbacks_check_time(1);
 }
 
 /* invoke periodic callbacks immediately */
-int target_call_timer_callbacks_now()
+int target_call_timer_callbacks_now(void)
 {
 	return target_call_timer_callbacks_check_time(0);
 }
@@ -2250,8 +2280,32 @@ uint32_t target_get_working_area_avail(struct target *target)
 
 static void target_destroy(struct target *target)
 {
+	struct target *tgt;
+
 	if (target->type->deinit_target)
 		target->type->deinit_target(target);
+
+	if (all_targets == target)
+		all_targets = target->next;
+	for (tgt = all_targets; tgt; tgt = tgt->next) {
+		if (tgt->next == target)
+			tgt->next = target->next;
+		if (tgt->smp) {
+			struct target_list *head, *tmp;
+			list_for_each_entry_safe(head, tmp, tgt->smp_targets, lh) {
+				if (head->target == target) {
+					list_del(&head->lh);
+					free(head);
+				}
+			}
+			/* If this target is now by itself clean up the smp config */
+			if(list_empty(tgt->smp_targets)) {
+				free(tgt->smp_targets);
+				tgt->smp_targets = &empty_smp_targets;
+				tgt->smp = 0;
+			}
+		}
+	}
 
 	if (target->semihosting)
 		free(target->semihosting->basedir);
@@ -2271,15 +2325,7 @@ static void target_destroy(struct target *target)
 
 	/* release the targets SMP list */
 	if (target->smp) {
-		struct target_list *head, *tmp;
-
-		list_for_each_entry_safe(head, tmp, target->smp_targets, lh) {
-			list_del(&head->lh);
-			head->target->smp = 0;
-			free(head);
-		}
-		if (target->smp_targets != &empty_smp_targets)
-			free(target->smp_targets);
+		target->smp_targets = &empty_smp_targets;
 		target->smp = 0;
 	}
 
@@ -2852,11 +2898,13 @@ static int find_target(struct command_invocation *cmd, const char *name)
 		command_print(cmd, "Target: %s is unknown, try one of:\n", name);
 		return ERROR_FAIL;
 	}
-	if (!target->tap->enabled) {
-		command_print(cmd, "Target: TAP %s is disabled, "
-			 "can't be the current target\n",
-			 target->tap->dotted_name);
-		return ERROR_FAIL;
+	if (target->has_tap) {
+		if (!target->tap->enabled) {
+			command_print(cmd, "Target: TAP %s is disabled, "
+				"can't be the current target\n",
+				target->tap->dotted_name);
+			return ERROR_FAIL;
+		}
 	}
 
 	cmd->ctx->current_target = target;
@@ -2885,7 +2933,7 @@ COMMAND_HANDLER(handle_targets_command)
 		const char *state;
 		char marker = ' ';
 
-		if (target->tap->enabled)
+		if (!target->has_tap || target->tap->enabled)
 			state = target_state_name(target);
 		else
 			state = "tap-disabled";
@@ -2902,7 +2950,7 @@ COMMAND_HANDLER(handle_targets_command)
 				target_type_name(target),
 				jim_nvp_value2name_simple(nvp_target_endian,
 					target->endianness)->name,
-				target->tap->dotted_name,
+				target->has_tap ? target->tap->dotted_name : "NOTAP",
 				state);
 		target = target->next;
 	}
@@ -2912,8 +2960,8 @@ COMMAND_HANDLER(handle_targets_command)
 
 /* every 300ms we check for reset & powerdropout and issue a "reset halt" if so. */
 
-static int power_dropout;
-static int srst_asserted;
+static int power_dropout = 0;
+static int srst_asserted = 0;
 
 static int run_power_restore;
 static int run_power_dropout;
@@ -2972,20 +3020,28 @@ static int sense_handler(void)
 	return ERROR_OK;
 }
 
+static bool is_poll_safe(void)
+{
+	if (transport_is_jtag() || transport_is_swd())
+		return is_jtag_poll_safe();
+	/* For other transports t is always safe */
+	return true;
+}
+
 /* process target state changes */
 static int handle_target(void *priv)
 {
 	Jim_Interp *interp = (Jim_Interp *)priv;
 	int retval = ERROR_OK;
 
-	if (!is_jtag_poll_safe()) {
+	if (!is_poll_safe()) {
 		/* polling is disabled currently */
 		return ERROR_OK;
 	}
 
 	/* we do not want to recurse here... */
 	static int recursive;
-	if (!recursive) {
+	if (!recursive && (transport_is_jtag() || transport_is_swd())) {
 		recursive = 1;
 		sense_handler();
 		/* danger! running these procedures can trigger srst assertions and power dropouts.
@@ -3031,13 +3087,14 @@ static int handle_target(void *priv)
 	 * Skip targets that are currently disabled.
 	 */
 	for (struct target *target = all_targets;
-			is_jtag_poll_safe() && target;
+			is_poll_safe() && target;
 			target = target->next) {
 
 		if (!target_was_examined(target))
 			continue;
 
-		if (!target->tap->enabled)
+		if ((transport_is_jtag() || transport_is_swd()) &&
+				target->has_tap && !target->tap->enabled)
 			continue;
 
 		if (target->backoff.times > target->backoff.count) {
@@ -3224,11 +3281,13 @@ COMMAND_HANDLER(handle_poll_command)
 	if (CMD_ARGC == 0) {
 		command_print(CMD, "background polling: %s",
 				jtag_poll_get_enabled() ? "on" : "off");
-		command_print(CMD, "TAP: %s (%s)",
-				target->tap->dotted_name,
-				target->tap->enabled ? "enabled" : "disabled");
-		if (!target->tap->enabled)
-			return ERROR_OK;
+		if (target->has_tap) {
+			command_print(CMD, "TAP: %s (%s)",
+					target->tap->dotted_name,
+					target->tap->enabled ? "enabled" : "disabled");
+			if (!target->tap->enabled)
+				return ERROR_OK;
+		}
 		retval = target_poll(target);
 		if (retval != ERROR_OK)
 			return retval;
@@ -5310,6 +5369,7 @@ enum target_cfg_param {
 	TCFG_DEFER_EXAMINE,
 	TCFG_GDB_PORT,
 	TCFG_GDB_MAX_CONNECTIONS,
+	TCFG_AUTO_DETECT,
 };
 
 static struct jim_nvp nvp_config_opts[] = {
@@ -5327,6 +5387,7 @@ static struct jim_nvp nvp_config_opts[] = {
 	{ .name = "-defer-examine",    .value = TCFG_DEFER_EXAMINE },
 	{ .name = "-gdb-port",         .value = TCFG_GDB_PORT },
 	{ .name = "-gdb-max-connections",   .value = TCFG_GDB_MAX_CONNECTIONS },
+	{ .name = "-auto-detect",      .value = TCFG_AUTO_DETECT },
 	{ .name = NULL, .value = -1 }
 };
 
@@ -5567,12 +5628,6 @@ no_params:
 				Jim_Obj *o_t;
 				struct jtag_tap *tap;
 
-				if (target->has_dap) {
-					Jim_SetResultString(goi->interp,
-						"target requires -dap parameter instead of -chain-position!", -1);
-					return JIM_ERR;
-				}
-
 				target_free_all_working_areas(target);
 				e = jim_getopt_obj(goi, &o_t);
 				if (e != JIM_OK)
@@ -5581,7 +5636,6 @@ no_params:
 				if (!tap)
 					return JIM_ERR;
 				target->tap = tap;
-				target->tap_configured = true;
 			} else {
 				if (goi->argc != 0)
 					goto no_params;
@@ -5594,7 +5648,7 @@ no_params:
 				e = jim_getopt_wide(goi, &w);
 				if (e != JIM_OK)
 					return e;
-				target->dbgbase = (uint32_t)w;
+				target->dbgbase = (target_addr_t)w;
 				target->dbgbase_set = true;
 			} else {
 				if (goi->argc != 0)
@@ -5659,11 +5713,13 @@ no_params:
 			}
 			Jim_SetResult(goi->interp, Jim_NewIntObj(goi->interp, target->gdb_max_connections));
 			break;
+		case TCFG_AUTO_DETECT:
+			target->auto_detect = true;
+			break;
 		}
 	} /* while (goi->argc) */
 
-
-		/* done - we return */
+	/* done - we return */
 	return JIM_OK;
 }
 
@@ -5734,7 +5790,7 @@ static int jim_target_examine(Jim_Interp *interp, int argc, Jim_Obj *const *argv
 	struct command_context *cmd_ctx = current_command_context(interp);
 	assert(cmd_ctx);
 	struct target *target = get_current_target(cmd_ctx);
-	if (!target->tap->enabled)
+	if (target->has_tap && !target->tap->enabled)
 		return jim_target_tap_disabled(interp);
 
 	if (allow_defer && target->defer_examine) {
@@ -5799,7 +5855,7 @@ static int jim_target_poll(Jim_Interp *interp, int argc, Jim_Obj *const *argv)
 	struct command_context *cmd_ctx = current_command_context(interp);
 	assert(cmd_ctx);
 	struct target *target = get_current_target(cmd_ctx);
-	if (!target->tap->enabled)
+	if (target->has_tap && !target->tap->enabled)
 		return jim_target_tap_disabled(interp);
 
 	int e;
@@ -5838,7 +5894,7 @@ static int jim_target_reset(Jim_Interp *interp, int argc, Jim_Obj *const *argv)
 	struct command_context *cmd_ctx = current_command_context(interp);
 	assert(cmd_ctx);
 	struct target *target = get_current_target(cmd_ctx);
-	if (!target->tap->enabled)
+	if (target->has_tap && !target->tap->enabled)
 		return jim_target_tap_disabled(interp);
 
 	if (!target->type->assert_reset || !target->type->deassert_reset) {
@@ -5873,7 +5929,7 @@ static int jim_target_halt(Jim_Interp *interp, int argc, Jim_Obj *const *argv)
 	struct command_context *cmd_ctx = current_command_context(interp);
 	assert(cmd_ctx);
 	struct target *target = get_current_target(cmd_ctx);
-	if (!target->tap->enabled)
+	if (target->has_tap && !target->tap->enabled)
 		return jim_target_tap_disabled(interp);
 	int e = target->type->halt(target);
 	return (e == ERROR_OK) ? JIM_OK : JIM_ERR;
@@ -5905,7 +5961,7 @@ static int jim_target_wait_state(Jim_Interp *interp, int argc, Jim_Obj *const *a
 	struct command_context *cmd_ctx = current_command_context(interp);
 	assert(cmd_ctx);
 	struct target *target = get_current_target(cmd_ctx);
-	if (!target->tap->enabled)
+	if (target->tap && !target->tap->enabled)
 		return jim_target_tap_disabled(interp);
 
 	e = target_wait_state(target, n->value, a);
@@ -6236,6 +6292,11 @@ static int target_create(struct jim_getopt_info *goi)
 		return JIM_ERR;
 	}
 
+	/* Default is that a target will use a tap to communicate, if not once can
+	 * clear this variable.
+	 */
+	target->has_tap = true;
+
 	/* set empty smp cluster */
 	target->smp_targets = &empty_smp_targets;
 
@@ -6296,23 +6357,6 @@ static int target_create(struct jim_getopt_info *goi)
 	goi->isconfigure = 1;
 	e = target_configure(goi, target);
 
-	if (e == JIM_OK) {
-		if (target->has_dap) {
-			if (!target->dap_configured) {
-				Jim_SetResultString(goi->interp, "-dap ?name? required when creating target", -1);
-				e = JIM_ERR;
-			}
-		} else {
-			if (!target->tap_configured) {
-				Jim_SetResultString(goi->interp, "-chain-position ?name? required when creating target", -1);
-				e = JIM_ERR;
-			}
-		}
-		/* tap must be set after target was configured */
-		if (!target->tap)
-			e = JIM_ERR;
-	}
-
 	if (e != JIM_OK) {
 		rtos_destroy(target);
 		free(target->gdb_port_override);
@@ -6351,6 +6395,17 @@ static int target_create(struct jim_getopt_info *goi)
 			free(target);
 			return JIM_ERR;
 		}
+	}
+
+	/* tap must be set after target was configured */
+	if (target->has_tap && !target->tap) {
+		Jim_SetResultString(goi->interp, "tap is not configured", -1);
+		rtos_destroy(target);
+		free(target->gdb_port_override);
+		free(target->trace_info);
+		free(target->type);
+		free(target);
+		return JIM_ERR;
 	}
 
 	/* create the target specific commands */
