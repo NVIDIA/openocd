@@ -129,9 +129,9 @@ typedef struct cswp_conn {
 		int	 (*get_devices)(void*, unsigned*, char**, size_t, size_t, char**,
 												size_t, size_t);
 		int	 (*get_device_capabilities)(void*, uint64_t, unsigned*, unsigned*);
-		int	 (*device_reg_read)(void*, unsigned, size_t, const unsigned*, uint32_t*,
+		int	 (*device_reg_read)(void*, unsigned, size_t, const uint64_t*, uint32_t*,
 														size_t);
-		int	 (*device_reg_write)(void*,	unsigned, size_t, const unsigned*,
+		int	 (*device_reg_write)(void*,	unsigned, size_t, const uint64_t*,
 															const uint32_t*, size_t);
 		int	 (*device_mem_read)(void*, unsigned, uint64_t, size_t, unsigned,
 															unsigned, uint8_t*, size_t*);
@@ -520,14 +520,16 @@ cswp_disable(cswp_conn_t* conn) {
 	}
 
 	/* Stop CSWP server */
-	retval = conn->api.term(conn->client);
-	if (retval != CSWP_SUCCESS) {
-		LOG_ERROR("Error [%d] in terminating CSWP server.", retval);
-		return ERROR_FAIL;
-	}
+	if (conn->api.term != NULL) {
+		retval = conn->api.term(conn->client);
+		if (retval != CSWP_SUCCESS) {
+			LOG_ERROR("Error [%d] in terminating CSWP server.", retval);
+			return ERROR_FAIL;
+		}
 
-	LOG_INFO("Connection to the CSWP server attached to %s has been terminated",
-						cswp_conn_name(conn));
+		LOG_INFO("Connection to the CSWP server attached to %s has been terminated",
+							cswp_conn_name(conn));
+	}
 
 	return ERROR_OK;
 }
@@ -778,20 +780,19 @@ cswp_process_reg_req(cswp_conn_t* conn, uint64_t devID, uint64_t address,
 	}
 
 	/* All registers are accesses as multiple of 32b, hence array of size 2 */
-	uint32_t registerID[2];	/* Register address for reg read/write requests */
+	uint64_t registerID[2];	/* Register address for reg read/write requests */
 	uint32_t registerValues[2]; /* Stored read values for reg read requests and
 																	write values for reg write requests */
 
-	registerID[0]			 = (uint32_t)address;
-	registerID[1]						= (uint32_t)(address + 4); /* Discarded if 32b
-																												read/write */
+	registerID[0]	= address;
+	registerID[1]	= address + 4; /* Discarded if 32b read/write */
 	size_t	 num_32b_reg_acc = (bytes_asked == 4) ? 1 : 2;
 	int	retval;
 
 	if (is_read) {
 		retval = conn->api.device_reg_read(conn->client, (uint32_t)devID,
-																			 num_32b_reg_acc, registerID,
-											 registerValues, num_32b_reg_acc);
+																				num_32b_reg_acc, registerID,
+																				registerValues, num_32b_reg_acc);
 		if (retval != CSWP_SUCCESS) {
 			return ERROR_FAIL;
 		}
@@ -808,7 +809,7 @@ cswp_process_reg_req(cswp_conn_t* conn, uint64_t devID, uint64_t address,
 		}
 		retval = conn->api.device_reg_write(conn->client, (uint32_t)devID,
 																				num_32b_reg_acc, registerID,
-											registerValues, num_32b_reg_acc);
+																				registerValues, num_32b_reg_acc);
 		if (retval != CSWP_SUCCESS) {
 			return ERROR_FAIL;
 		}
@@ -879,7 +880,7 @@ cswp_mem_ap_read(cswp_conn_t* conn, uint64_t devID, uint64_t address,
 	}
 
 	if (retval != ERROR_OK) {
-		LOG_ERROR("CSWP read failed at 0x%" PRIx64 ": %d", address, retval);
+		LOG_DEBUG("CSWP read failed at 0x%" PRIx64 ": %d", address, retval);
 		return ERROR_FAIL;
 	}
 
@@ -955,7 +956,7 @@ cswp_mem_ap_write(cswp_conn_t* conn, uint64_t devID, uint64_t address,
 	}
 
 	if (retval != ERROR_OK) {
-		LOG_ERROR("CSWP write failed at 0x%" PRIx64 ": %d", address, retval);
+		LOG_DEBUG("CSWP write failed at 0x%" PRIx64 ": %d", address, retval);
 		return ERROR_FAIL;
 	}
 
@@ -1046,13 +1047,16 @@ cswp_close_connection(cswp_conn_t* conn) {
 		return ERROR_FAIL;
 	}
 
-	int retval = cswp_disable(conn);
-	if (retval != ERROR_OK) {
-		LOG_ERROR("Error [%d] in stopping CSWP server for connection.", retval);
-		return retval;
+	if (cswp_is_enabled(conn)) {
+		int retval = cswp_disable(conn);
+		if (retval != ERROR_OK) {
+			LOG_ERROR("Error [%d] in stopping CSWP server for connection.", retval);
+			return retval;
+		}
 	}
 
-	conn->api.delete_client(conn->client); /* Delete CSWP client context */
+	if (conn->api.delete_client != NULL)
+		conn->api.delete_client(conn->client); /* Delete CSWP client context */
 	conn->client	= NULL; /* Set CSWP client context to NULL */
 	conn->enabled = false; /* Set CSWP debug interface to disabled */
 
