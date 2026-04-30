@@ -130,6 +130,9 @@ struct target {
 	/** Should we defer examine to later */
 	bool defer_examine;
 
+	/** Should we retry examine */
+	bool retry_examine;
+
 	/**
 	 * Indicates whether this target has been examined.
 	 *
@@ -447,6 +450,7 @@ static inline bool target_was_examined(struct target *target)
 static inline void target_set_examined(struct target *target)
 {
 	target->examined = true;
+	target->retry_examine = false;
 }
 
 /**
@@ -743,6 +747,11 @@ uint32_t target_get_working_area_avail(struct target *target);
  * Free all the resources allocated by targets and the target layer
  */
 void target_quit(void);
+
+/**
+ * Called regularly once init is done to refresh target state
+ */
+int handle_target(void *);
 
 extern struct target *all_targets;
 

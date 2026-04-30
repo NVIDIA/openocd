@@ -2334,7 +2334,8 @@ static int smp_reg_list_noread(struct target *target,
 						if (a->size != b->size) {
 							LOG_WARNING("SMP register %s is %d bits on %s "
 									"target, but %d bits on %s target.",
-									a->name, a->size, a->name, b->size, b->name);
+									a->name, a->size, target_name(head->target), b->size,
+									target_name(target));
 						}
 						break;
 					}

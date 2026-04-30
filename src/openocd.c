@@ -9,6 +9,9 @@
  *                                                                         *
  *   Copyright (C) 2008 Richard Missenden                                  *
  *   richard.missenden@googlemail.com                                      *
+ *                                                                         *
+ *   Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES                    *
+ *   Remi Machet <rmachet@nvidia.com>                                      *
  ***************************************************************************/
 
 #ifdef HAVE_CONFIG_H
@@ -180,6 +183,12 @@ COMMAND_HANDLER(handle_init_command)
 	target_register_event_callback(log_target_callback_event_handler, CMD_CTX);
 
 	if (command_run_line(CMD_CTX, "_run_post_init_commands") != ERROR_OK)
+		return ERROR_FAIL;
+
+	/* Now that we started we poll for any state change. */
+	if (target_register_timer_callback(&handle_target,
+			TARGET_DEFAULT_POLLING_INTERVAL, TARGET_TIMER_TYPE_PERIODIC,
+			CMD_CTX) != ERROR_OK)
 		return ERROR_FAIL;
 
 	return ERROR_OK;

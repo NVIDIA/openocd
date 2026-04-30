@@ -748,6 +748,7 @@ static int no_mmu(struct target *target, int *enabled)
 static inline void target_reset_examined(struct target *target)
 {
 	target->examined = false;
+	target->retry_examine = false;
 }
 
 static int default_examine(struct target *target)
@@ -766,12 +767,19 @@ static int default_check_reset(struct target *target)
  * Keep in sync */
 int target_examine_one(struct target *target)
 {
-	target_call_event_callbacks(target, TARGET_EVENT_EXAMINE_START);
+	if (!target->retry_examine)
+		/* Do not re-run the callback if called before. */
+		target_call_event_callbacks(target, TARGET_EVENT_EXAMINE_START);
 
 	int retval = target->type->examine(target);
+
 	if (retval != ERROR_OK) {
 		target_reset_examined(target);
-		target_call_event_callbacks(target, TARGET_EVENT_EXAMINE_FAIL);
+		if (retval == ERROR_WAIT)
+			/* Do not call the callback since we are still trying. */
+			target->retry_examine = true;
+		else
+			target_call_event_callbacks(target, TARGET_EVENT_EXAMINE_FAIL);
 		return retval;
 	}
 
@@ -1570,8 +1578,6 @@ static int target_profiling(struct target *target, uint32_t *samples,
 			num_samples, seconds);
 }
 
-static int handle_target(void *priv);
-
 static int target_init_one(struct command_context *cmd_ctx,
 		struct target *target)
 {
@@ -1647,11 +1653,6 @@ static int target_init(struct command_context *cmd_ctx)
 		return ERROR_OK;
 
 	retval = target_register_user_commands(cmd_ctx);
-	if (retval != ERROR_OK)
-		return retval;
-
-	retval = target_register_timer_callback(&handle_target,
-			polling_interval, TARGET_TIMER_TYPE_PERIODIC, cmd_ctx->interp);
 	if (retval != ERROR_OK)
 		return retval;
 
@@ -3029,7 +3030,7 @@ static bool is_poll_safe(void)
 }
 
 /* process target state changes */
-static int handle_target(void *priv)
+int handle_target(void *priv)
 {
 	Jim_Interp *interp = (Jim_Interp *)priv;
 	int retval = ERROR_OK;
@@ -3089,6 +3090,9 @@ static int handle_target(void *priv)
 	for (struct target *target = all_targets;
 			is_poll_safe() && target;
 			target = target->next) {
+
+		if (target->retry_examine)
+			target_examine_one(target);
 
 		if (!target_was_examined(target))
 			continue;
