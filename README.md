@@ -7,10 +7,10 @@ modified to support NVidia's chips and platforms.
 
 # Overview
 The versions of OpenOCD available on this repository can be used to attach
-and debug various NVidia chips including:
--Grace (branch [openocd-0.12.0](https://github.com/NVIDIA/openocd/blob/openocd-0.12.0))
--Thor (branch [openocd-0.12.0](https://github.com/NVIDIA/openocd/blob/openocd-0.12.0))
--Vera (branch [openocd-0.12.0](https://github.com/NVIDIA/openocd/blob/openocd-0.12.0))
+and debug various NVidia chips including:<br>
+-Grace (branch [openocd-0.12.0](https://github.com/NVIDIA/openocd/blob/openocd-0.12.0))<br>
+-Thor (branch [openocd-0.12.0](https://github.com/NVIDIA/openocd/blob/openocd-0.12.0))<br>
+-Vera (branch [releases/strata](https://github.com/NVIDIA/openocd/tree/releases/strata)(stable) and [openocd-0.12.0](https://github.com/NVIDIA/openocd/blob/openocd-0.12.0)(dev))<br>
 OpenOCD is used in this context to act as a gdb server and convert GDB commands
 into debug requests to the various debug agents built into NVidia's chips then
 transmit them over JTAG or CSWP to the part.
@@ -39,7 +39,7 @@ branch of this repository run:
 ./bootstrap
 mkdir build
 cd build
-../configure --prefix=$DEST --enable-cswp --enable-ftdi CFLAGS='-I$DEST/include'
+../configure --prefix=$DEST --enable-cswp --enable-ftdi CFLAGS="-I$DEST/include"
 make install -j8
 mkdir -p $DEST/share/openocd/contrib/nvidia
 cp $DEST/lib/libcdebug_client.so $DEST/lib/libcstrace_client.so $DEST/share/openocd/contrib/nvidia/
