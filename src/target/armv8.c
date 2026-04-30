@@ -5,6 +5,9 @@
  *                                                                         *
  *   Copyright (C) 2018 by Liviu Ionescu                                   *
  *   <ilg@livius.net>                                                      *
+ *                                                                         *
+ *   Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES                    *
+ *   Remi Machet <rmachet@nvidia.com>                                      *
  ***************************************************************************/
 
 #ifdef HAVE_CONFIG_H
@@ -634,7 +637,7 @@ int armv8_read_mpidr(struct armv8_common *armv8)
 	int retval = ERROR_FAIL;
 	struct arm *arm = &armv8->arm;
 	struct arm_dpm *dpm = armv8->arm.dpm;
-	uint32_t mpidr;
+	uint64_t mpidr;
 
 	retval = dpm->prepare(dpm);
 	if (retval != ERROR_OK)
@@ -647,17 +650,27 @@ int armv8_read_mpidr(struct armv8_common *armv8)
 			return retval;
 	}
 
-	retval = dpm->instr_read_data_r0(dpm, armv8_opcode(armv8, READ_REG_MPIDR), &mpidr);
+	retval = dpm->instr_read_data_r0_64(dpm, armv8_opcode(armv8, READ_REG_MPIDR), &mpidr);
 	if (retval != ERROR_OK)
 		goto done;
 	if (mpidr & 1U<<31) {
 		armv8->multi_processor_system = (mpidr >> 30) & 1;
-		armv8->cluster_id = (mpidr >> 8) & 0xf;
-		armv8->cpu_id = mpidr & 0x3;
-		LOG_INFO("%s cluster %x core %x %s", target_name(armv8->arm.target),
+		armv8->multi_threaded_system = (mpidr >> 24) & 1;
+		if (armv8->multi_threaded_system) {
+			/* This is a multi-threaded system cpu_id is the combined aff3, aff2,
+			 * aff1 and aff0 as it gets too complicated to decode otherwise.
+			 */
+			armv8->cluster_id = (mpidr >> 16) & 0xff;	/* Assume cluster is aff2 */
+			armv8->cpu_id = ((mpidr >> 8ULL) & 0xff000000) | (mpidr & 0x00ffffff);
+		} else {
+			armv8->cluster_id = (mpidr >> 8) & 0xff;
+			armv8->cpu_id = mpidr & 0xff;
+		}
+		LOG_INFO("%s cluster 0x%x core 0x%x %s%s", target_name(armv8->arm.target),
 			armv8->cluster_id,
 			armv8->cpu_id,
-			armv8->multi_processor_system == 0 ? "multi core" : "single core");
+			armv8->multi_processor_system == 0 ? "multi core" : "single core",
+			armv8->multi_threaded_system != 0 ? " MT" : "");
 	} else
 		LOG_ERROR("mpidr not in multiprocessor format");
 
@@ -1605,16 +1618,22 @@ struct reg_cache *armv8_build_reg_cache(struct target *target)
 	int num_regs32 = ARMV8_NUM_REGS32;
 	struct reg_cache **cache_p = register_get_last_cache_p(&target->reg_cache);
 	struct reg_cache *cache = malloc(sizeof(struct reg_cache));
-	struct reg_cache *cache32 = malloc(sizeof(struct reg_cache));
+	struct reg_cache *cache32 = NULL;
 	struct reg *reg_list = calloc(num_regs, sizeof(struct reg));
-	struct reg *reg_list32 = calloc(num_regs32, sizeof(struct reg));
+	struct reg *reg_list32 = NULL;
 	struct arm_reg *arch_info = calloc(num_regs, sizeof(struct arm_reg));
 	struct reg_feature *feature;
 	int i;
 
 	/* Build the process context cache */
 	cache->name = "Aarch64 registers";
-	cache->next = cache32;
+	if (armv8->features & ARMV8_FEAT_AA32) {
+		cache32 = malloc(sizeof(struct reg_cache));
+		reg_list32 = calloc(num_regs32, sizeof(struct reg));
+		cache->next = cache32;
+	} else {
+		cache->next = NULL;
+	}
 	cache->reg_list = reg_list;
 	cache->num_regs = num_regs;
 
@@ -1656,35 +1675,37 @@ struct reg_cache *armv8_build_reg_cache(struct target *target)
 	arm->pc = reg_list + ARMV8_PC;
 	arm->core_cache = cache;
 
-	/* shadow cache for ARM mode registers */
-	cache32->name = "Aarch32 registers";
-	cache32->next = NULL;
-	cache32->reg_list = reg_list32;
-	cache32->num_regs = num_regs32;
+	if (armv8->features & ARMV8_FEAT_AA32) {
+		/* shadow cache for ARM mode registers */
+		cache32->name = "Aarch32 registers";
+		cache32->next = NULL;
+		cache32->reg_list = reg_list32;
+		cache32->num_regs = num_regs32;
 
-	for (i = 0; i < num_regs32; i++) {
-		reg_list32[i].name = armv8_regs32[i].name;
-		reg_list32[i].size = armv8_regs32[i].bits;
-		reg_list32[i].value = &arch_info[armv8_regs32[i].id].value[armv8_regs32[i].mapping];
-		reg_list32[i].type = &armv8_reg32_type;
-		reg_list32[i].arch_info = &arch_info[armv8_regs32[i].id];
-		reg_list32[i].group = armv8_regs32[i].group;
-		reg_list32[i].number = i;
-		reg_list32[i].exist = true;
-		reg_list32[i].caller_save = true;
+		for (i = 0; i < num_regs32; i++) {
+			reg_list32[i].name = armv8_regs32[i].name;
+			reg_list32[i].size = armv8_regs32[i].bits;
+			reg_list32[i].value = &arch_info[armv8_regs32[i].id].value[armv8_regs32[i].mapping];
+			reg_list32[i].type = &armv8_reg32_type;
+			reg_list32[i].arch_info = &arch_info[armv8_regs32[i].id];
+			reg_list32[i].group = armv8_regs32[i].group;
+			reg_list32[i].number = i;
+			reg_list32[i].exist = true;
+			reg_list32[i].caller_save = true;
 
-		feature = calloc(1, sizeof(struct reg_feature));
-		if (feature) {
-			feature->name = armv8_regs32[i].feature;
-			reg_list32[i].feature = feature;
-		} else
-			LOG_ERROR("unable to allocate feature list");
+			feature = calloc(1, sizeof(struct reg_feature));
+			if (feature) {
+				feature->name = armv8_regs32[i].feature;
+				reg_list32[i].feature = feature;
+			} else
+				LOG_ERROR("unable to allocate feature list");
 
-		reg_list32[i].reg_data_type = calloc(1, sizeof(struct reg_data_type));
-		if (reg_list32[i].reg_data_type)
-			reg_list32[i].reg_data_type->type = armv8_regs32[i].type;
-		else
-			LOG_ERROR("unable to allocate reg type list");
+			reg_list32[i].reg_data_type = calloc(1, sizeof(struct reg_data_type));
+			if (reg_list32[i].reg_data_type)
+				reg_list32[i].reg_data_type->type = armv8_regs32[i].type;
+			else
+				LOG_ERROR("unable to allocate reg type list");
+		}
 	}
 
 	(*cache_p) = cache;
@@ -1762,8 +1783,8 @@ int armv8_get_gdb_reg_list(struct target *target,
 	int i;
 
 	if (arm->core_state == ARM_STATE_AARCH64) {
-
-		LOG_DEBUG("Creating Aarch64 register list for target %s", target_name(target));
+		/* This can take a long time, log it to keep the impatient user at bay */
+		LOG_INFO("Creating Aarch64 register list for target %s", target_name(target));
 
 		switch (reg_class) {
 		case REG_CLASS_GENERAL:
@@ -1790,7 +1811,8 @@ int armv8_get_gdb_reg_list(struct target *target,
 	} else {
 		struct reg_cache *cache32 = arm->core_cache->next;
 
-		LOG_DEBUG("Creating Aarch32 register list for target %s", target_name(target));
+		/* This can take a long time, log it to keep the impatient user at bay */
+		LOG_INFO("Creating Aarch32 register list for target %s", target_name(target));
 
 		switch (reg_class) {
 		case REG_CLASS_GENERAL:

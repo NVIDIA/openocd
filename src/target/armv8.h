@@ -110,6 +110,9 @@ enum run_control_op {
 
 #define ARMV8_COMMON_MAGIC 0x0A450AAAU
 
+#define ARMV8_FEAT_DOPD	1	/* FEAT_DoPD / Debug over Powerdown */
+#define ARMV8_FEAT_AA32 2 /* Combination of all FEAT_AA32ELX ORed together */
+
 /* VA to PA translation operations opc2 values*/
 #define V2PCWPR  0
 #define V2PCWPW  1
@@ -191,8 +194,12 @@ struct armv8_common {
 
 	/* mdir */
 	uint8_t multi_processor_system;
+	uint8_t multi_threaded_system;
 	uint8_t cluster_id;
-	uint8_t cpu_id;
+	uint32_t cpu_id;
+
+	/* ARM v8/v9 features supported */
+	uint64_t features;
 
 	/* armv8 aarch64 need below information for page translation */
 	uint8_t va_size;
@@ -252,6 +259,8 @@ static inline bool is_armv8(struct armv8_common *armv8)
 #define CPUV8_DBG_ECCR		0x098
 #define CPUV8_DBG_PRCR		0x310
 #define CPUV8_DBG_PRSR		0x314
+#define CPUV8_DBG_EDPFR		0xd20
+#define CPUV8_DBG_EDDEVID	0xfc8
 
 #define CPUV8_DBG_DTRRX		0x080
 #define CPUV8_DBG_ITR		0x084

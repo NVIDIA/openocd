@@ -56,6 +56,7 @@ static int aarch64_virt2phys(struct target *target,
 	target_addr_t virt, target_addr_t *phys);
 static int aarch64_read_cpu_memory(struct target *target,
 	uint64_t address, uint32_t size, uint32_t count, uint8_t *buffer);
+static int aarch64_enable_reset_catch(struct target *target, bool enable);
 
 static int aarch64_restore_system_control_reg(struct target *target)
 {
@@ -356,7 +357,7 @@ static int aarch64_prepare_halt_smp(struct target *target, bool exc_target, stru
 	}
 
 	if (p_first) {
-		if (exc_target && first)
+		if (first)
 			*p_first = first;
 		else
 			*p_first = target;
@@ -429,8 +430,14 @@ static int aarch64_halt_smp(struct target *target, bool exc_target)
 
 			retval = aarch64_check_state_one(curr, PRSR_HALT, PRSR_HALT, &halted, NULL);
 			if (retval != ERROR_OK || !halted) {
-				all_halted = false;
-				break;
+				/* If PE is in reset we set the reset catch and assume it will stop
+				   when woken up, or stay alseep. */
+				if (curr->state == TARGET_RESET) {
+					aarch64_enable_reset_catch(curr, true);
+				} else {
+					all_halted = false;
+					break;
+				}
 			}
 		}
 
@@ -507,14 +514,15 @@ static int aarch64_poll(struct target *target)
 {
 	enum target_state prev_target_state;
 	int retval = ERROR_OK;
-	int halted;
+	int halted = 0;
+	uint32_t prsr = 0;
 
 	retval = aarch64_check_state_one(target,
-				PRSR_HALT, PRSR_HALT, &halted, NULL);
-	if (retval != ERROR_OK)
-		return retval;
-
-	if (halted) {
+				PRSR_HALT, PRSR_HALT, &halted, &prsr);
+	if ((retval != ERROR_OK) || ((prsr & 1) == 0)) {
+		/* core is off */
+		target->state = TARGET_RESET;
+	}	else if (halted) {
 		prev_target_state = target->state;
 		if (prev_target_state != TARGET_HALTED) {
 			enum target_debug_reason debug_reason = target->debug_reason;
@@ -548,7 +556,7 @@ static int aarch64_poll(struct target *target)
 	} else
 		target->state = TARGET_RUNNING;
 
-	return retval;
+	return ERROR_OK;
 }
 
 static int aarch64_halt(struct target *target)
@@ -737,13 +745,19 @@ static int aarch64_prep_restart_smp(struct target *target, int handle_breakpoint
 	foreach_smp_target(head, target->smp_targets) {
 		struct target *curr = head->target;
 
-		/* skip calling target */
-		if (curr == target)
-			continue;
 		if (!target_was_examined(curr))
 			continue;
-		if (curr->state != TARGET_HALTED)
+		if (curr->state != TARGET_HALTED) {
+			struct armv8_common *armv8 = target_to_armv8(curr);
+
+			if (curr->state == TARGET_RESET) {
+				/* Clear the reset catch setup when we stopped */
+				aarch64_enable_reset_catch(curr, false);
+			}
+			/* Clear the DBGRQ event, now that we are resuming */
+			arm_cti_ack_events(armv8->cti, CTI_TRIG(HALT));
 			continue;
+		}
 
 		/*  resume at current address, not in step mode */
 		retval = aarch64_restore_one(curr, 1, &address, handle_breakpoints, 0);
@@ -847,8 +861,23 @@ static int aarch64_resume(struct target *target, int current,
 	struct armv8_common *armv8 = target_to_armv8(target);
 	armv8->last_run_control_op = ARMV8_RUNCONTROL_RESUME;
 
-	if (target->state != TARGET_HALTED)
-		return ERROR_TARGET_NOT_HALTED;
+	/* No need to go through this if target is not halted,
+	   however in SMP one of the attached targets may be halted. */
+	if (target->state != TARGET_HALTED) {
+		bool not_halted = true;
+
+		if (target->smp) {
+			struct target_list *head;
+
+			foreach_smp_target(head, target->smp_targets)
+				if (head->target->state == TARGET_HALTED) {
+					not_halted = false;
+					break;
+				}
+		}
+		if (not_halted)
+			return ERROR_TARGET_NOT_HALTED;
+	}
 
 	/*
 	 * If this target is part of a SMP group, prepare the others
@@ -860,13 +889,15 @@ static int aarch64_resume(struct target *target, int current,
 		retval = aarch64_prep_restart_smp(target, handle_breakpoints, NULL);
 		if (retval != ERROR_OK)
 			return retval;
+	} else {
+		/* all targets prepared, restore and restart the current target */
+		retval = aarch64_restore_one(target, current, &addr, handle_breakpoints,
+					debug_execution);
+		if (retval != ERROR_OK)
+			return retval;
 	}
 
-	/* all targets prepared, restore and restart the current target */
-	retval = aarch64_restore_one(target, current, &addr, handle_breakpoints,
-				 debug_execution);
-	if (retval == ERROR_OK)
-		retval = aarch64_restart_one(target, RESTART_SYNC);
+	retval = aarch64_restart_one(target, RESTART_SYNC);
 	if (retval != ERROR_OK)
 		return retval;
 
@@ -1204,7 +1235,8 @@ static int aarch64_restore_context(struct target *target, bool bpwp)
 	if (retval == ERROR_OK) {
 		/* registers are now invalid */
 		register_cache_invalidate(arm->core_cache);
-		register_cache_invalidate(arm->core_cache->next);
+		if (arm->core_cache->next)
+			register_cache_invalidate(arm->core_cache->next);
 	}
 
 	return retval;
@@ -1871,22 +1903,39 @@ static int aarch64_hit_watchpoint(struct target *target,
 static int aarch64_enable_reset_catch(struct target *target, bool enable)
 {
 	struct armv8_common *armv8 = target_to_armv8(target);
-	uint32_t edecr;
 	int retval;
 
-	retval = mem_ap_read_atomic_u32(armv8->arm.debug_ap,
-			armv8->debug_base + CPUV8_DBG_EDECR, &edecr);
-	LOG_DEBUG("EDECR = 0x%08" PRIx32 ", enable=%d", edecr, enable);
-	if (retval != ERROR_OK)
-		return retval;
+	if (armv8->features & ARMV8_FEAT_DOPD) {
+		uint32_t devctl;
 
-	if (enable)
-		edecr |= ECR_RCE;
-	else
-		edecr &= ~ECR_RCE;
+		retval = arm_cti_read_reg(armv8->cti, CTI_DEVCTL, &devctl);
+		LOG_DEBUG("CTIDEVCTL = 0x%08" PRIx32 ", enable=%d", devctl, enable);
+		if (retval != ERROR_OK)
+			return retval;
 
-	return mem_ap_write_atomic_u32(armv8->arm.debug_ap,
-			armv8->debug_base + CPUV8_DBG_EDECR, edecr);
+		if (enable)
+			devctl |= CTI_DEVCTL_RCE;
+		else
+			devctl &= ~CTI_DEVCTL_RCE;
+		retval = arm_cti_write_reg(armv8->cti, CTI_DEVCTL, devctl);
+	} else {
+		uint32_t edecr;
+
+		retval = mem_ap_read_atomic_u32(armv8->arm.debug_ap,
+				armv8->debug_base + CPUV8_DBG_EDECR, &edecr);
+		LOG_DEBUG("EDECR = 0x%08" PRIx32 ", enable=%d", edecr, enable);
+		if (retval != ERROR_OK)
+			return retval;
+
+		if (enable)
+			edecr |= ECR_RCE;
+		else
+			edecr &= ~ECR_RCE;
+
+		retval = mem_ap_write_atomic_u32(armv8->arm.debug_ap,
+				armv8->debug_base + CPUV8_DBG_EDECR, edecr);
+	}
+	return retval;
 }
 
 static int aarch64_clear_reset_catch(struct target *target)
@@ -1972,7 +2021,8 @@ static int aarch64_assert_reset(struct target *target)
 	/* registers are now invalid */
 	if (target_was_examined(target)) {
 		register_cache_invalidate(armv8->arm.core_cache);
-		register_cache_invalidate(armv8->arm.core_cache->next);
+		if (armv8->arm.core_cache->next)
+			register_cache_invalidate(armv8->arm.core_cache->next);
 	}
 
 	target->state = TARGET_RESET;
@@ -2453,6 +2503,11 @@ static int aarch64_read_memory(struct target *target, target_addr_t address,
 	int mmu_enabled = 0;
 	int retval;
 
+	if (target->state != TARGET_HALTED) {
+		LOG_ERROR("%s: target %s not halted", __func__, target_name(target));
+		return ERROR_TARGET_INVALID;
+	}
+
 	/* determine if MMU was enabled on target stop */
 	retval = aarch64_mmu(target, &mmu_enabled);
 	if (retval != ERROR_OK)
@@ -2489,6 +2544,11 @@ static int aarch64_write_memory(struct target *target, target_addr_t address,
 {
 	int mmu_enabled = 0;
 	int retval;
+
+	if (target->state != TARGET_HALTED) {
+		LOG_ERROR("%s: target %s not halted", __func__, target_name(target));
+		return ERROR_TARGET_INVALID;
+	}
 
 	/* determine if MMU was enabled on target stop */
 	retval = aarch64_mmu(target, &mmu_enabled);
@@ -2543,9 +2603,9 @@ static int aarch64_examine_first(struct target *target)
 	struct aarch64_private_config *pc = target->private_config;
 	int i;
 	int retval = ERROR_OK;
-	uint64_t debug, ttypr;
-	uint32_t cpuid, prsr;
-	uint32_t tmp0, tmp1, tmp2, tmp3;
+	uint64_t debug, ttypr, edpfr;
+	uint32_t cpuid, prsr, devid;
+	uint32_t tmp0, tmp1, tmp2, tmp3, tmp4, tmp5;
 	debug = ttypr = cpuid = prsr = 0;
 
 	if (!pc) {
@@ -2594,7 +2654,7 @@ static int aarch64_examine_first(struct target *target)
 		uint32_t cti_devarch;
 
 		/* Core not powered up ? Check CTI. */
-		retval = arm_cti_read_reg(pc->cti, 0xFBC, &cti_devarch);
+		retval = arm_cti_read_reg(pc->cti, CTI_DEVARCH, &cti_devarch);
 		LOG_DEBUG("Core %" PRId32 " is not powered up, CTIDEVARCH=0x%08x err=%d",
 							target->coreid, cti_devarch, retval);
 		if ((retval == ERROR_OK) && ((cti_devarch & 0xfff0ffff) == 0x47701A14)) {
@@ -2636,20 +2696,30 @@ static int aarch64_examine_first(struct target *target)
 		return retval;
 	}
 
+	retval = mem_ap_read_u32(armv8->arm.debug_ap,
+			armv8->debug_base + CPUV8_DBG_EDDEVID, &devid);
+
+	retval = mem_ap_read_u32(armv8->arm.debug_ap,
+			armv8->debug_base + CPUV8_DBG_EDPFR, &tmp4);
+
+	retval = mem_ap_read_u32(armv8->arm.debug_ap,
+			armv8->debug_base + CPUV8_DBG_EDPFR + 4, &tmp5);
+
 	retval = mem_ap_flush(armv8->arm.debug_ap);
 	if (retval != ERROR_OK) {
 		LOG_ERROR("%s: examination failed\n", target_name(target));
 		return retval;
 	}
 
-	ttypr |= tmp1;
-	ttypr = (ttypr << 32) | tmp0;
-	debug |= tmp3;
-	debug = (debug << 32) | tmp2;
+	ttypr = (((uint64_t)tmp1) << 32) | tmp0;
+	debug = (((uint64_t)tmp3) << 32) | tmp2;
+	edpfr = (((uint64_t)tmp5) << 32) | tmp4;
 
 	LOG_DEBUG("cpuid = 0x%08" PRIx32, cpuid);
 	LOG_DEBUG("ttypr = 0x%08" PRIx64, ttypr);
 	LOG_DEBUG("debug = 0x%08" PRIx64, debug);
+	LOG_DEBUG("devid = 0x%08" PRIx32, devid);
+	LOG_DEBUG("edpfr = 0x%08" PRIx64, edpfr);
 
 	if (!pc->cti) {
 		LOG_TARGET_ERROR(target, "CTI not specified");
@@ -2692,6 +2762,19 @@ static int aarch64_examine_first(struct target *target)
 
 	LOG_DEBUG("Configured %i hw breakpoints, %i watchpoints",
 		aarch64->brp_num, aarch64->wp_num);
+
+	/* Detect supported features that we care about */
+	armv8->features = 0;
+	if (((devid >> 4) & 0xf) == 1)
+		armv8->features |= ARMV8_FEAT_DOPD;
+	if ((((edpfr >> 12) & 0xf) == 0x2) || (((edpfr >> 8) & 0xf) == 0x2)
+			|| (((edpfr >> 4) & 0xf) == 0x2) || (((edpfr >> 4) & 0xf) == 0x0)
+			|| ((edpfr & 0xf) == 0x2) || ((edpfr & 0xf) == 0x0))
+		armv8->features |= ARMV8_FEAT_AA32;
+	LOG_DEBUG("Feature mask set to 0x%016" PRIx64, armv8->features);
+
+	/* In aarch64 the default is aa64 */
+	armv8->arm.core_state = ARM_STATE_AARCH64;
 
 	target->state = TARGET_UNKNOWN;
 	target->debug_reason = DBG_REASON_NOTHALTED;

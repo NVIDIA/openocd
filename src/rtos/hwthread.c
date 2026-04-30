@@ -133,8 +133,13 @@ static int hwthread_update_threads(struct rtos *rtos)
 			/* find an interesting thread to set as current */
 			switch (current_reason) {
 			case DBG_REASON_UNDEFINED:
-				current_reason = curr->debug_reason;
-				current_thread = tid;
+				/* Skip over thread that are in the unknown state because
+				   qfThreadInfo will also skip them and GDB does not like
+				   when the selected thread is not in that list (crash).  */
+				if (curr->state != TARGET_UNKNOWN) {
+					current_reason = curr->debug_reason;
+					current_thread = tid;
+				}
 				break;
 			case DBG_REASON_SINGLESTEP:
 				/* single-step can only be overridden by itself */
@@ -268,7 +273,8 @@ static int hwthread_get_thread_reg_list(struct rtos *rtos, int64_t thread_id,
 		if (!reg_list[i]->valid) {
 			retval = reg_list[i]->type->get(reg_list[i]);
 			if (retval != ERROR_OK) {
-				LOG_ERROR("Couldn't get register %s.", reg_list[i]->name);
+				LOG_ERROR("Couldn't get register %s for target %s.", reg_list[i]->name,
+									target_name(target));
 				free(reg_list);
 				free(*rtos_reg_list);
 				return retval;

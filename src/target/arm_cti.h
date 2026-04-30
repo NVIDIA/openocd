@@ -43,12 +43,15 @@
 #define CTI_CHIN_STATUS		0x138
 #define CTI_CHOU_STATUS		0x13C
 #define CTI_GATE			0x140
+#define CTI_DEVCTL			0x150
 #define CTI_UNLOCK			0xFB0
+#define CTI_DEVARCH			0xFBC
 
 #define CTI_CHNL(x)			(1 << x)
 #define CTI_TRIG_HALT		0
 #define CTI_TRIG_RESUME		1
 #define CTI_TRIG(n)			(1 << CTI_TRIG_##n)
+#define CTI_DEVCTL_RCE		(1<<1)
 
 /* forward-declare arm_cti struct */
 struct arm_cti;
