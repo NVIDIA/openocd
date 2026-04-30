@@ -3034,6 +3034,9 @@ int handle_target(void *priv)
 {
 	Jim_Interp *interp = (Jim_Interp *)priv;
 	int retval = ERROR_OK;
+	static struct target *target = NULL;
+	int64_t start_time;
+	int iterations;
 
 	if (!is_poll_safe()) {
 		/* polling is disabled currently */
@@ -3086,10 +3089,23 @@ int handle_target(void *priv)
 
 	/* Poll targets for state changes unless that's globally disabled.
 	 * Skip targets that are currently disabled.
+	 * We limit how much time is spent in this loop to avoid blocking
+	 * all other TCL functions as this loop operates.
 	 */
-	for (struct target *target = all_targets;
+	start_time = timeval_ms();
+	for (target = (target == NULL) ? all_targets : target, iterations = 0;
 			is_poll_safe() && target;
-			target = target->next) {
+			target = target->next, iterations++) {
+		uint64_t current_time = timeval_ms();
+
+		/* On targets with many cores or slow targets this loop can end up
+		   taking much longer than TARGET_DEFAULT_POLLING_INTERVAL and
+		   using all processing power, limit how much is processed on
+		   each call to handle_target(). */
+		if ((current_time - start_time) > TARGET_DEFAULT_POLLING_INTERVAL/2) {
+			LOG_DEBUG("Yielding to other tasks after %d iterations.", iterations);
+			break;
+		}
 
 		if (target->retry_examine)
 			target_examine_one(target);
