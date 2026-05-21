@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 
+if TARGET_RISCV
 noinst_LTLIBRARIES += %D%/libriscv.la
 %C%_libriscv_la_SOURCES = \
        %D%/asm.h \
@@ -16,3 +17,4 @@ noinst_LTLIBRARIES += %D%/libriscv.la
        %D%/riscv-013.c \
        %D%/riscv.c \
        %D%/riscv_semihosting.c
+endif

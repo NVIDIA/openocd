@@ -1,9 +1,30 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 
-%C%_libtarget_la_LIBADD = %D%/openrisc/libopenrisc.la \
-	%D%/riscv/libriscv.la \
+if TARGET_RISCV
+RISCV_LIBS = %D%/riscv/libriscv.la
+else
+RISCV_LIBS =
+endif
+
+if TARGET_XTENSA
+XTENSA_LIBS = \
 	%D%/xtensa/libxtensa.la \
 	%D%/espressif/libespressif.la
+else
+XTENSA_LIBS =
+endif
+
+if TARGET_OPENRISC
+OPENRISC_LIBS = \
+	%D%/openrisc/libopenrisc.la
+else
+OPENRISC_LIBS =
+endif
+
+%C%_libtarget_la_LIBADD = \
+	$(OPENRISC_LIBS) \
+	$(RISCV_LIBS) \
+	$(XTENSA_LIBS)
 
 %C%_libtarget_la_CPPFLAGS = $(AM_CPPFLAGS)
 
@@ -23,11 +44,9 @@ noinst_LTLIBRARIES += %D%/libtarget.la
 	$(STM8_SRC) \
 	$(INTEL_IA32_SRC) \
 	$(ESIRISC_SRC) \
-        $(ARC_SRC) \
+	$(ARC_SRC) \
 	%D%/avrt.c \
-	%D%/dsp563xx.c \
-	%D%/dsp563xx_once.c \
-	%D%/dsp5680xx.c \
+	$(DSP_SRC) \
 	%D%/hla_target.c \
 	$(ARMV8_SRC) \
 	$(MIPS64_SRC)
@@ -113,12 +132,17 @@ ARM_DEBUG_SRC = \
 	%D%/arm_tpiu_swo.c \
 	%D%/arm_cti.c
 
+if TARGET_AVR32
 AVR32_SRC = \
 	%D%/avr32_ap7k.c \
 	%D%/avr32_jtag.c \
 	%D%/avr32_mem.c \
 	%D%/avr32_regs.c
+else
+AVR32_SRC =
+endif
 
+if TARGET_MIPS
 MIPS32_SRC = \
 	%D%/mips32.c \
 	%D%/mips_m4k.c \
@@ -133,6 +157,18 @@ MIPS64_SRC = \
 	%D%/mips_mips64.c \
 	%D%/trace.c \
 	%D%/mips_ejtag.c
+else
+MIPS32_SRC =
+MIPS64_SRC =
+endif
+
+if TARGET_DSP
+DSP_SRC = %D%/dsp563xx.c \
+	%D%/dsp563xx_once.c \
+	%D%/dsp5680xx.c
+else
+DSP_SRC =
+endif
 
 NDS32_SRC = \
 	%D%/nds32.c \
@@ -146,25 +182,41 @@ NDS32_SRC = \
 	%D%/nds32_v3m.c \
 	%D%/nds32_aice.c
 
+if TARGET_STM8
 STM8_SRC = \
 	%D%/stm8.c
+else
+STM8_SRC =
+endif
 
+if TARGET_INTEL_IA32
 INTEL_IA32_SRC = \
 	%D%/quark_x10xx.c \
 	%D%/quark_d20xx.c \
 	%D%/lakemont.c \
 	%D%/x86_32_common.c
+else
+INTEL_IA32_SRC =
+endif
 
+if TARGET_ESIRISC
 ESIRISC_SRC = \
 	%D%/esirisc.c \
 	%D%/esirisc_jtag.c \
 	%D%/esirisc_trace.c
+else
+ESIRISC_SRC =
+endif
 
+if TARGET_ARC
 ARC_SRC = \
-        %D%/arc.c \
-        %D%/arc_cmd.c \
-        %D%/arc_jtag.c \
-        %D%/arc_mem.c
+	%D%/arc.c \
+	%D%/arc_cmd.c \
+	%D%/arc_jtag.c \
+	%D%/arc_mem.c
+else
+ARC_SRC =
+endif
 
 %C%_libtarget_la_SOURCES += \
 	%D%/algorithm.h \

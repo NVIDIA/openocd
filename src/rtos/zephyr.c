@@ -26,9 +26,11 @@
 
 #define UNIMPLEMENTED 0xFFFFFFFFU
 
+#if BUILD_TARGET_ARC
 /* ARC specific defines */
 #define ARC_AUX_SEC_BUILD_REG 0xdb
 #define ARC_REG_NUM 38
+#endif
 
 /* ARM specific defines */
 #define ARM_XPSR_OFFSET 28
@@ -87,6 +89,7 @@ static const struct stack_register_offset arm_callee_saved[] = {
 	{ ARMV7M_R11, 28, 32 },
 };
 
+#if BUILD_TARGET_ARC
 static const struct stack_register_offset arc_callee_saved[] = {
 	{ ARC_R13,  0,  32 },
 	{ ARC_R14,  4,  32 },
@@ -105,6 +108,8 @@ static const struct stack_register_offset arc_callee_saved[] = {
 	{ ARC_FP,  56,  32 },
 	{ ARC_R30,  60,  32 }
 };
+#endif
+
 static const struct rtos_register_stacking arm_callee_saved_stacking = {
 	.stack_registers_size = 36,
 	.stack_growth_direction = -1,
@@ -112,12 +117,14 @@ static const struct rtos_register_stacking arm_callee_saved_stacking = {
 	.register_offsets = arm_callee_saved,
 };
 
+#if BUILD_TARGET_ARC
 static const struct rtos_register_stacking arc_callee_saved_stacking = {
 	.stack_registers_size = 64,
 	.stack_growth_direction = -1,
 	.num_output_registers = ARRAY_SIZE(arc_callee_saved),
 	.register_offsets = arc_callee_saved,
 };
+#endif
 
 static const struct stack_register_offset arm_cpu_saved[] = {
 	{ ARMV7M_R0,   0,  32 },
@@ -139,6 +146,7 @@ static const struct stack_register_offset arm_cpu_saved[] = {
 	{ ARMV7M_XPSR, 28, 32 },
 };
 
+#if BUILD_TARGET_ARC
 static struct stack_register_offset arc_cpu_saved[] = {
 	{ ARC_R0,		-1,  32 },
 	{ ARC_R1,		-1,  32 },
@@ -179,7 +187,7 @@ static struct stack_register_offset arc_cpu_saved[] = {
 	{ ARC_LP_END,		-1,  32 },
 	{ ARC_STATUS32,		 4,  32 }
 };
-
+#endif
 
 enum zephyr_symbol_values {
 	ZEPHYR_VAL__KERNEL,
@@ -213,6 +221,7 @@ static const struct rtos_register_stacking arm_cpu_saved_fp_stacking = {
 	.register_offsets = arm_cpu_saved,
 };
 
+#if BUILD_TARGET_ARC
 /* stack_registers_size is 8 because besides caller registers
  * there are only blink and Status32 registers on stack left */
 static struct rtos_register_stacking arc_cpu_saved_stacking = {
@@ -292,6 +301,7 @@ static int zephyr_get_arc_state(struct rtos *rtos, target_addr_t *addr,
 
 	return retval;
 }
+#endif
 
 /* ARM Cortex-M-specific implementation */
 static int zephyr_get_arm_state(struct rtos *rtos, target_addr_t *addr,
@@ -357,6 +367,7 @@ static struct zephyr_params zephyr_params_list[] = {
 		.get_cpu_state = &zephyr_get_arm_state,
 
 	},
+#if BUILD_TARGET_ARC
 	{
 		.target_name = "arcv2",
 		.pointer_width = 4,
@@ -364,6 +375,7 @@ static struct zephyr_params zephyr_params_list[] = {
 		.cpu_saved_nofp_stacking = &arc_cpu_saved_stacking,
 		.get_cpu_state = &zephyr_get_arc_state,
 	},
+#endif
 	{
 		.target_name = NULL
 	}
@@ -422,6 +434,8 @@ static int zephyr_create(struct target *target)
 
 	LOG_INFO("Zephyr: looking for target: %s", name);
 
+	/* ARC specific logic only makes sense when ARC targets are built. */
+#if BUILD_TARGET_ARC
 	/* ARC specific, check if EM target has security subsystem
 	 * In case of ARC_HAS_SECURE zephyr option enabled
 	 * the thread stack contains blink,sec_stat,status32 register
@@ -441,6 +455,7 @@ static int zephyr_create(struct target *target)
 			arc_cpu_saved_stacking.stack_registers_size = 12;
 		}
 	}
+#endif
 
 	for (struct zephyr_params *p = zephyr_params_list; p->target_name; p++) {
 		if (!strcmp(p->target_name, name)) {

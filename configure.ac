@@ -309,6 +309,46 @@ AC_ARG_ENABLE([amtjtagaccel],
   AS_HELP_STRING([--enable-amtjtagaccel], [Enable building the Amontec JTAG-Accelerator driver]),
   [build_amtjtagaccel=$enableval], [build_amtjtagaccel=no])
 
+AC_ARG_ENABLE([target-mips],
+  AS_HELP_STRING([--disable-target-mips], [Disable building MIPS target support]),
+  [build_target_mips=$enableval], [build_target_mips=yes])
+
+AC_ARG_ENABLE([target-riscv],
+  AS_HELP_STRING([--disable-target-riscv], [Disable building RISC-V target support]),
+  [build_target_riscv=$enableval], [build_target_riscv=yes])
+
+AC_ARG_ENABLE([target-xtensa],
+  AS_HELP_STRING([--disable-target-xtensa], [Disable building Xtensa target support]),
+  [build_target_xtensa=$enableval], [build_target_xtensa=yes])
+
+AC_ARG_ENABLE([target-openrisc],
+  AS_HELP_STRING([--disable-target-openrisc], [Disable building OpenRISC target support]),
+  [build_target_openrisc=$enableval], [build_target_openrisc=yes])
+
+AC_ARG_ENABLE([target-arc],
+  AS_HELP_STRING([--disable-target-arc], [Disable building ARC target support]),
+  [build_target_arc=$enableval], [build_target_arc=yes])
+
+AC_ARG_ENABLE([target-avr32],
+  AS_HELP_STRING([--disable-target-avr32], [Disable building AVR32 target support]),
+  [build_target_avr32=$enableval], [build_target_avr32=yes])
+
+AC_ARG_ENABLE([target-stm8],
+  AS_HELP_STRING([--disable-target-stm8], [Disable building STM8 target support]),
+  [build_target_stm8=$enableval], [build_target_stm8=yes])
+
+AC_ARG_ENABLE([target-intel-ia32],
+  AS_HELP_STRING([--disable-target-intel-ia32], [Disable building Intel IA32 target support]),
+  [build_target_intel_ia32=$enableval], [build_target_intel_ia32=yes])
+
+AC_ARG_ENABLE([target-esirisc],
+  AS_HELP_STRING([--disable-target-esirisc], [Disable building ESIRISC target support]),
+  [build_target_esirisc=$enableval], [build_target_esirisc=yes])
+
+AC_ARG_ENABLE([target-dsp],
+  AS_HELP_STRING([--disable-target-dsp], [Disable building DSP target support]),
+  [build_target_dsp=$enableval], [build_target_dsp=yes])
+
 AS_CASE(["${host_cpu}"],
   [arm*|aarch64], [
     AC_ARG_ENABLE([bcm2835gpio],
@@ -389,6 +429,10 @@ AC_ARG_ENABLE([internal-libjaylink],
   AS_HELP_STRING([--disable-internal-libjaylink],
   [Disable building internal libjaylink]),
   [use_internal_libjaylink=$enableval], [use_internal_libjaylink=yes])
+
+AC_ARG_ENABLE([rtos],
+  AS_HELP_STRING([--disable-rtos], [Disable building RTOS awareness support]),
+  [build_rtos=$enableval], [build_rtos=yes])
 
 AC_ARG_ENABLE([remote-bitbang],
   AS_HELP_STRING([--enable-remote-bitbang], [Enable building support for the Remote Bitbang jtag driver]),
@@ -500,6 +544,70 @@ AS_IF([test "x$build_dummy" = "xyes"], [
   AC_DEFINE([BUILD_DUMMY], [1], [1 if you want dummy driver.])
 ], [
   AC_DEFINE([BUILD_DUMMY], [0], [0 if you don't want dummy driver.])
+])
+
+AS_IF([test "x$build_target_mips" = "xyes"], [
+  AC_DEFINE([BUILD_TARGET_MIPS], [1], [1 if you want MIPS target support.])
+], [
+  AC_DEFINE([BUILD_TARGET_MIPS], [0], [0 if you don't want MIPS target support.])
+])
+
+AS_IF([test "x$build_target_riscv" = "xyes"], [
+  AC_DEFINE([BUILD_TARGET_RISCV], [1], [1 if you want RISC-V target support.])
+], [
+  AC_DEFINE([BUILD_TARGET_RISCV], [0], [0 if you don't want RISC-V target support.])
+])
+
+AS_IF([test "x$build_target_xtensa" = "xyes"], [
+  AC_DEFINE([BUILD_TARGET_XTENSA], [1], [1 if you want Xtensa target support.])
+], [
+  AC_DEFINE([BUILD_TARGET_XTENSA], [0], [0 if you don't want Xtensa target support.])
+])
+
+AS_IF([test "x$build_target_avr32" = "xyes"], [
+  AC_DEFINE([BUILD_TARGET_AVR32], [1], [1 if you want AVR32 target support.])
+], [
+  AC_DEFINE([BUILD_TARGET_AVR32], [0], [0 if you don't want AVR32 target support.])
+])
+
+AS_IF([test "x$build_target_stm8" = "xyes"], [
+  AC_DEFINE([BUILD_TARGET_STM8], [1], [1 if you want STM8 target support.])
+], [
+  AC_DEFINE([BUILD_TARGET_STM8], [0], [0 if you don't want STM8 target support.])
+])
+
+AS_IF([test "x$build_target_intel_ia32" = "xyes"], [
+  AC_DEFINE([BUILD_TARGET_INTEL_IA32], [1], [1 if you want Intel IA32 target support.])
+], [
+  AC_DEFINE([BUILD_TARGET_INTEL_IA32], [0], [0 if you don't want Intel IA32 target support.])
+])
+
+AS_IF([test "x$build_target_esirisc" = "xyes"], [
+  AC_DEFINE([BUILD_TARGET_ESIRISC], [1], [1 if you want ESIRISC target support.])
+], [
+  AC_DEFINE([BUILD_TARGET_ESIRISC], [0], [0 if you don't want ESIRISC target support.])
+])
+
+AS_IF([test "x$build_target_dsp" = "xyes"], [
+  AC_DEFINE([BUILD_TARGET_DSP], [1], [1 if you want DSP target support.])
+], [
+  AC_DEFINE([BUILD_TARGET_DSP], [0], [0 if you don't want DSP target support.])
+])
+
+AS_IF([test "x$build_rtos" = "xyes"], [
+  AC_DEFINE([ENABLE_RTOS], [1], [Define if RTOS support is enabled.])
+])
+
+AS_IF([test "x$build_target_arc" = "xyes"], [
+  AC_DEFINE([BUILD_TARGET_ARC], [1], [1 if you want ARC target support.])
+], [
+  AC_DEFINE([BUILD_TARGET_ARC], [0], [0 if you don't want ARC target support.])
+])
+
+AS_IF([test "x$build_target_openrisc" = "xyes"], [
+  AC_DEFINE([BUILD_TARGET_OPENRISC], [1], [1 if you want OpenRISC target support.])
+], [
+  AC_DEFINE([BUILD_TARGET_OPENRISC], [0], [0 if you don't want OpenRISC target support.])
 ])
 
 AS_IF([test "x$build_ep93xx" = "xyes"], [
@@ -755,6 +863,17 @@ AM_CONDITIONAL([AT91RM9200], [test "x$build_at91rm9200" = "xyes"])
 AM_CONDITIONAL([BCM2835GPIO], [test "x$build_bcm2835gpio" = "xyes"])
 AM_CONDITIONAL([IMX_GPIO], [test "x$build_imx_gpio" = "xyes"])
 AM_CONDITIONAL([AM335XGPIO], [test "x$build_am335xgpio" = "xyes"])
+AM_CONDITIONAL([TARGET_OPENRISC], [test "x$build_target_openrisc" = "xyes"])
+AM_CONDITIONAL([TARGET_ARC], [test "x$build_target_arc" = "xyes"])
+AM_CONDITIONAL([TARGET_AVR32], [test "x$build_target_avr32" = "xyes"])
+AM_CONDITIONAL([TARGET_STM8], [test "x$build_target_stm8" = "xyes"])
+AM_CONDITIONAL([TARGET_INTEL_IA32], [test "x$build_target_intel_ia32" = "xyes"])
+AM_CONDITIONAL([TARGET_ESIRISC], [test "x$build_target_esirisc" = "xyes"])
+AM_CONDITIONAL([TARGET_DSP], [test "x$build_target_dsp" = "xyes"])
+AM_CONDITIONAL([TARGET_MIPS], [test "x$build_target_mips" = "xyes"])
+AM_CONDITIONAL([TARGET_RISCV], [test "x$build_target_riscv" = "xyes"])
+AM_CONDITIONAL([TARGET_XTENSA], [test "x$build_target_xtensa" = "xyes"])
+AM_CONDITIONAL([RTOS], [test "x$build_rtos" = "xyes"])
 AM_CONDITIONAL([BITBANG], [test "x$build_bitbang" = "xyes"])
 AM_CONDITIONAL([JTAG_VPI], [test "x$build_jtag_vpi" = "xyes"])
 AM_CONDITIONAL([VDEBUG], [test "x$build_vdebug" = "xyes"])

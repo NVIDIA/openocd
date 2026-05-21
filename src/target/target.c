@@ -84,35 +84,57 @@ extern struct target_type fa526_target;
 extern struct target_type feroceon_target;
 extern struct target_type dragonite_target;
 extern struct target_type xscale_target;
+#if BUILD_TARGET_XTENSA
 extern struct target_type xtensa_chip_target;
+#endif
 extern struct target_type cortexm_target;
 extern struct target_type cortexa_target;
 extern struct target_type aarch64_target;
 extern struct target_type cortexr4_target;
 extern struct target_type arm11_target;
 extern struct target_type ls1_sap_target;
+#if BUILD_TARGET_MIPS
 extern struct target_type mips_m4k_target;
 extern struct target_type mips_mips64_target;
+#endif
 extern struct target_type avr_target;
+#if BUILD_TARGET_DSP
 extern struct target_type dsp563xx_target;
 extern struct target_type dsp5680xx_target;
+#endif
 extern struct target_type testee_target;
+#if BUILD_TARGET_AVR32
 extern struct target_type avr32_ap7k_target;
+#endif
 extern struct target_type hla_target;
 extern struct target_type nds32_v2_target;
 extern struct target_type nds32_v3_target;
 extern struct target_type nds32_v3m_target;
+#if BUILD_TARGET_XTENSA
 extern struct target_type esp32_target;
 extern struct target_type esp32s2_target;
 extern struct target_type esp32s3_target;
+#endif
+#if BUILD_TARGET_OPENRISC
 extern struct target_type or1k_target;
+#endif
+#if BUILD_TARGET_INTEL_IA32
 extern struct target_type quark_x10xx_target;
 extern struct target_type quark_d20xx_target;
+#endif
+#if BUILD_TARGET_STM8
 extern struct target_type stm8_target;
+#endif
+#if BUILD_TARGET_RISCV
 extern struct target_type riscv_target;
+#endif
 extern struct target_type mem_ap_target;
+#if BUILD_TARGET_ESIRISC
 extern struct target_type esirisc_target;
+#endif
+#if BUILD_TARGET_ARC
 extern struct target_type arcv2_target;
+#endif
 
 static struct target_type *target_types[] = {
 	&arm7tdmi_target,
@@ -126,35 +148,59 @@ static struct target_type *target_types[] = {
 	&feroceon_target,
 	&dragonite_target,
 	&xscale_target,
+#if BUILD_TARGET_XTENSA
 	&xtensa_chip_target,
+#endif
 	&cortexm_target,
 	&cortexa_target,
 	&cortexr4_target,
 	&arm11_target,
 	&ls1_sap_target,
+#if BUILD_TARGET_MIPS
 	&mips_m4k_target,
+#endif
 	&avr_target,
+#if BUILD_TARGET_DSP
 	&dsp563xx_target,
 	&dsp5680xx_target,
+#endif
 	&testee_target,
+#if BUILD_TARGET_AVR32
 	&avr32_ap7k_target,
+#endif
 	&hla_target,
 	&nds32_v2_target,
 	&nds32_v3_target,
 	&nds32_v3m_target,
+#if BUILD_TARGET_XTENSA
 	&esp32_target,
 	&esp32s2_target,
 	&esp32s3_target,
+#endif
+#if BUILD_TARGET_OPENRISC
 	&or1k_target,
+#endif
+#if BUILD_TARGET_INTEL_IA32
 	&quark_x10xx_target,
 	&quark_d20xx_target,
+#endif
+#if BUILD_TARGET_STM8
 	&stm8_target,
+#endif
+#if BUILD_TARGET_RISCV
 	&riscv_target,
+#endif
 	&mem_ap_target,
+#if BUILD_TARGET_ESIRISC
 	&esirisc_target,
+#endif
+#if BUILD_TARGET_ARC
 	&arcv2_target,
+#endif
 	&aarch64_target,
+#if BUILD_TARGET_MIPS
 	&mips_mips64_target,
+#endif
 	NULL,
 };
 

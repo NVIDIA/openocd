@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 
+if TARGET_XTENSA
 noinst_LTLIBRARIES += %D%/libxtensa.la
 %C%_libxtensa_la_SOURCES = \
        %D%/xtensa.c \
@@ -9,3 +10,4 @@ noinst_LTLIBRARIES += %D%/libxtensa.la
        %D%/xtensa_debug_module.c \
        %D%/xtensa_debug_module.h \
        %D%/xtensa_regs.h
+endif

@@ -8,6 +8,25 @@ noinst_LTLIBRARIES += %D%/libocdflashnor.la
 	%D%/drivers.c \
 	$(NORHEADERS)
 
+if TARGET_RISCV
+NOR_FESPI = %D%/fespi.c
+else
+NOR_FESPI =
+endif
+
+if TARGET_DSP
+NOR_DSP = %D%/dsp5680xx_flash.c
+else
+NOR_DSP =
+endif
+
+if TARGET_MIPS
+NOR_MIPS = %D%/pic32mx.c \
+	%D%/ath79.c
+else
+NOR_MIPS =
+endif
+
 NOR_DRIVERS = \
 	%D%/aduc702x.c \
 	%D%/aducm360.c \
@@ -17,7 +36,6 @@ NOR_DRIVERS = \
 	%D%/at91samd.c \
 	%D%/at91sam3.c \
 	%D%/at91sam7.c \
-	%D%/ath79.c \
 	%D%/atsamv.c \
 	%D%/atsame5.c \
 	%D%/avrf.c \
@@ -25,12 +43,12 @@ NOR_DRIVERS = \
 	%D%/cc3220sf.c \
 	%D%/cc26xx.c \
 	%D%/cfi.c \
-	%D%/dsp5680xx_flash.c \
+	$(NOR_DSP) \
 	%D%/efm32.c \
 	%D%/em357.c \
 	%D%/esirisc_flash.c \
 	%D%/faux.c \
-	%D%/fespi.c \
+	$(NOR_FESPI) \
 	%D%/fm3.c \
 	%D%/fm4.c \
 	%D%/jtagspi.c \
@@ -50,7 +68,7 @@ NOR_DRIVERS = \
 	%D%/nrf5.c \
 	%D%/numicro.c \
 	%D%/ocl.c \
-	%D%/pic32mx.c \
+	$(NOR_MIPS) \
 	%D%/psoc4.c \
 	%D%/psoc5lp.c \
 	%D%/psoc6.c \

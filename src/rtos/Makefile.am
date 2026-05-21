@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 
+if RTOS
 noinst_LTLIBRARIES += %D%/librtos.la
 %C%_librtos_la_SOURCES = \
 	%D%/rtos.c \
@@ -33,3 +34,8 @@ noinst_LTLIBRARIES += %D%/librtos.la
 	%D%/rtos_riot_stackings.h \
 	%D%/rtos_ucos_iii_stackings.h \
 	%D%/nuttx_header.h
+else
+noinst_LTLIBRARIES += %D%/librtos.la
+%C%_librtos_la_SOURCES = \
+	%D%/rtos_stub.c
+endif

@@ -17,7 +17,9 @@ extern const struct flash_driver at91sam4_flash;
 extern const struct flash_driver at91sam4l_flash;
 extern const struct flash_driver at91sam7_flash;
 extern const struct flash_driver at91samd_flash;
+#if BUILD_TARGET_MIPS
 extern const struct flash_driver ath79_flash;
+#endif
 extern const struct flash_driver atsame5_flash;
 extern const struct flash_driver atsamv_flash;
 extern const struct flash_driver avr_flash;
@@ -25,14 +27,18 @@ extern const struct flash_driver bluenrgx_flash;
 extern const struct flash_driver cc3220sf_flash;
 extern const struct flash_driver cc26xx_flash;
 extern const struct flash_driver cfi_flash;
+#if BUILD_TARGET_DSP
 extern const struct flash_driver dsp5680xx_flash;
+#endif
 extern const struct flash_driver efm32_flash;
 extern const struct flash_driver em357_flash;
 extern const struct flash_driver esirisc_flash;
 extern const struct flash_driver faux_flash;
 extern const struct flash_driver fm3_flash;
 extern const struct flash_driver fm4_flash;
+#if BUILD_TARGET_RISCV
 extern const struct flash_driver fespi_flash;
+#endif
 extern const struct flash_driver jtagspi_flash;
 extern const struct flash_driver kinetis_flash;
 extern const struct flash_driver kinetis_ke_flash;
@@ -50,7 +56,9 @@ extern const struct flash_driver nrf5_flash;
 extern const struct flash_driver nrf51_flash;
 extern const struct flash_driver numicro_flash;
 extern const struct flash_driver ocl_flash;
+#if BUILD_TARGET_MIPS
 extern const struct flash_driver pic32mx_flash;
+#endif
 extern const struct flash_driver psoc4_flash;
 extern const struct flash_driver psoc5lp_flash;
 extern const struct flash_driver psoc5lp_eeprom_flash;
@@ -93,7 +101,9 @@ static const struct flash_driver * const flash_drivers[] = {
 	&at91sam4l_flash,
 	&at91sam7_flash,
 	&at91samd_flash,
+#if BUILD_TARGET_MIPS
 	&ath79_flash,
+#endif
 	&atsame5_flash,
 	&atsamv_flash,
 	&avr_flash,
@@ -101,14 +111,18 @@ static const struct flash_driver * const flash_drivers[] = {
 	&cc3220sf_flash,
 	&cc26xx_flash,
 	&cfi_flash,
+#if BUILD_TARGET_DSP
 	&dsp5680xx_flash,
+#endif
 	&efm32_flash,
 	&em357_flash,
 	&esirisc_flash,
 	&faux_flash,
 	&fm3_flash,
 	&fm4_flash,
+#if BUILD_TARGET_RISCV
 	&fespi_flash,
+#endif
 	&jtagspi_flash,
 	&kinetis_flash,
 	&kinetis_ke_flash,
@@ -126,7 +140,9 @@ static const struct flash_driver * const flash_drivers[] = {
 	&nrf51_flash,
 	&numicro_flash,
 	&ocl_flash,
+#if BUILD_TARGET_MIPS
 	&pic32mx_flash,
+#endif
 	&psoc4_flash,
 	&psoc5lp_flash,
 	&psoc5lp_eeprom_flash,

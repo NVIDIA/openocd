@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 
+if TARGET_OPENRISC
 noinst_LTLIBRARIES += %D%/libopenrisc.la
 %C%_libopenrisc_la_SOURCES = \
 	%D%/or1k.c \
@@ -12,3 +13,4 @@ noinst_LTLIBRARIES += %D%/libopenrisc.la
 	%D%/or1k_du.h \
 	%D%/or1k_tap.h \
 	%D%/jsp_server.h
+endif

@@ -713,7 +713,9 @@ void server_free(void)
 {
 	tcl_service_free();
 	telnet_service_free();
+#if BUILD_TARGET_OPENRISC
 	jsp_service_free();
+#endif
 
 	free(bindto_name);
 }
@@ -835,9 +837,11 @@ int server_register_commands(struct command_context *cmd_ctx)
 	if (retval != ERROR_OK)
 		return retval;
 
+	#if BUILD_TARGET_OPENRISC
 	retval = jsp_register_commands(cmd_ctx);
 	if (retval != ERROR_OK)
 		return retval;
+	#endif
 
 	return register_commands(cmd_ctx, NULL, server_command_handlers);
 }

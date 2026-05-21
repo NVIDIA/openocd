@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 
+if TARGET_XTENSA
 noinst_LTLIBRARIES += %D%/libespressif.la
 %C%_libespressif_la_SOURCES = \
        %D%/esp_xtensa.c \
@@ -13,3 +14,4 @@ noinst_LTLIBRARIES += %D%/libespressif.la
        %D%/esp32s3.c \
        %D%/esp_semihosting.c \
        %D%/esp_semihosting.h
+endif
