@@ -773,6 +773,15 @@ COMMAND_HANDLER(handle_shutdown_command)
 	return ERROR_COMMAND_CLOSE_CONNECTION;
 }
 
+COMMAND_HANDLER(handle_is_shutdown_pending_command)
+{
+	if (CMD_ARGC != 0)
+		return ERROR_COMMAND_SYNTAX_ERROR;
+	bool pending = openocd_is_shutdown_pending();
+	command_print_sameline(CMD, "%s", pending ? "true" : "false");
+	return ERROR_OK;
+}
+
 COMMAND_HANDLER(handle_poll_period_command)
 {
 	if (CMD_ARGC == 0)
@@ -808,6 +817,13 @@ static const struct command_registration server_command_handlers[] = {
 		.mode = COMMAND_ANY,
 		.usage = "",
 		.help = "shut the server down",
+	},
+	{
+		.name = "is_shutdown_pending",
+		.handler = &handle_is_shutdown_pending_command,
+		.mode = COMMAND_ANY,
+		.usage = "",
+		.help = "check if the server is shutting down",
 	},
 	{
 		.name = "poll_period",
