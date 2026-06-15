@@ -10,6 +10,9 @@
  *   Copyright (C) 2008, Duane Ellis                                       *
  *   openocd@duaneeellis.com                                               *
  *                                                                         *
+ *   Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES                    *
+ *   Remi Machet <rmachet@nvidia.com>                                      *
+ *                                                                         *
  *   part of this file is taken from libcli (libcli.sourceforge.net)       *
  *   Copyright (C) David Parrish (david@dparrish.com)                      *
  ***************************************************************************/
@@ -413,6 +416,28 @@ int unregister_commands_match(struct command_context *cmd_ctx, const char *forma
 	return ERROR_OK;
 }
 
+static
+int unregister_every_commands(struct command_context *context)
+{
+	if (!context)
+		return ERROR_OK;
+	Jim_Interp *interp = context->interp;
+	Jim_HashTableIterator *iter = Jim_GetHashTableIterator(&interp->commands);
+	Jim_HashEntry *he;
+	while ((he = Jim_NextHashEntry(iter)) != NULL) {
+		Jim_Obj *name = Jim_GetHashEntryKey(he);
+		/*
+		 * Keep the command name alive while Jim_DeleteCommand()
+		 * removes the hash entry that owns this key.
+		 */
+		Jim_IncrRefCount(name);
+		Jim_DeleteCommand(interp, name);
+		Jim_DecrRefCount(interp, name);
+	}
+	Jim_FreeHashTableIterator(iter);
+	return ERROR_OK;
+}
+
 int unregister_all_commands(struct command_context *context,
 	const char *cmd_prefix)
 {
@@ -420,7 +445,7 @@ int unregister_all_commands(struct command_context *context,
 		return ERROR_OK;
 
 	if (!cmd_prefix || !*cmd_prefix)
-		return unregister_commands_match(context, "*");
+		return unregister_every_commands(context);
 
 	int retval = unregister_commands_match(context, "%s *", cmd_prefix);
 	if (retval != ERROR_OK)
