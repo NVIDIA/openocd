@@ -357,6 +357,7 @@ cswp_enable(cswp_conn_t* conn) {
 	char				serverID[MAX_SERVER_NAME_LEN];
 	uint32_t		serverVersion					= 0;
 
+	LOG_DEBUG("Connect to CSWP server...");
 	retval = conn->api.init(conn->client, clientID, ProtocolVersion,
 														&serverProtocolVersion, serverID, serverIDSize,
 														&serverVersion);
@@ -381,6 +382,7 @@ cswp_enable(cswp_conn_t* conn) {
 	conn->enabled = true; /* Set CSWP debug interface to enabled */
 
 	/* Get device information */
+	LOG_DEBUG("Enumerate CSWP server devices...");
 	char deviceList_2D[MAX_NUM_DEVICES][MAX_DEV_NAME_LEN];
 	char deviceTypes_2D[MAX_NUM_DEVICES][MAX_DEV_TYPE_LEN];
 	char * deviceList[MAX_NUM_DEVICES] = {0};
@@ -403,6 +405,7 @@ cswp_enable(cswp_conn_t* conn) {
 	conn->num_devices = (size_t)retval;
 
 	/* Get device capabilities */
+	LOG_DEBUG("Get CSWP server devices capabilities...");
 	uint32_t capabilities[conn->num_devices];
 	uint32_t capabilityData[conn->num_devices];
 	retval = cswp_get_dev_cap(conn, capabilities, capabilityData,
@@ -413,6 +416,7 @@ cswp_enable(cswp_conn_t* conn) {
 	}
 
 	/* Open all available devices with batch command */
+	LOG_DEBUG("Open all CSWP devices...");
 	char deviceInfoList_2D[conn->num_devices][MAX_DEV_INFO_LEN];
 	char *deviceInfoList[conn->num_devices];
 	for (unsigned i = 0; i < conn->num_devices; ++i)
@@ -1048,6 +1052,7 @@ cswp_close_connection(cswp_conn_t* conn) {
 	}
 
 	if (cswp_is_enabled(conn)) {
+		LOG_DEBUG("Disable active CSWP connection...");
 		int retval = cswp_disable(conn);
 		if (retval != ERROR_OK) {
 			LOG_ERROR("Error [%d] in stopping CSWP server for connection.", retval);
@@ -1055,8 +1060,10 @@ cswp_close_connection(cswp_conn_t* conn) {
 		}
 	}
 
-	if (conn->api.delete_client != NULL)
+	if (conn->api.delete_client != NULL) {
+		LOG_DEBUG("Cleaning CSWP client context...");
 		conn->api.delete_client(conn->client); /* Delete CSWP client context */
+	}
 	conn->client	= NULL; /* Set CSWP client context to NULL */
 	conn->enabled = false; /* Set CSWP debug interface to disabled */
 
@@ -1067,6 +1074,7 @@ cswp_close_connection(cswp_conn_t* conn) {
 
 	/* Close the library handle */
 	if (conn->lib_handle) {
+		LOG_DEBUG("Closing CSWP library handle...");
 		dlclose(conn->lib_handle);
 		conn->lib_handle = NULL;
 	}
@@ -1370,7 +1378,8 @@ static int cswp_init(struct command_context *cmd_ctx)
 		/* Enable CSWP and open all devices */
 		retval = cswp_enable(conn);
 		if (retval != ERROR_OK) {
-			LOG_ERROR("Failed to enable CSWP connection %s.", entry->name);
+			LOG_ERROR("Failed to enable CSWP connection %s, check permissions and"
+								" that CSWP is enabled on this system.", entry->name);
 			return retval;
 		}
 		LOG_INFO("CSWP connection %s using %s %s successfully enabled",
