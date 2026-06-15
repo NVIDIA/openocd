@@ -300,10 +300,20 @@ AC_ARG_ENABLE([jtag_driver],
 AC_ARG_ENABLE([cswp],
   AS_HELP_STRING([--enable-cswp], [Enable CSWP support]),
   [enable_cswp=$enableval], [enable_cswp=no])
-AM_CONDITIONAL([CSWP], [test "x$enable_cswp" = "xyes"])
-if test "x$enable_cswp" = "xyes"; then
+AM_CONDITIONAL([CSWP], [test "x$enable_cswp" != "xno"])
+AS_IF([test "x$enable_cswp" != "xno"], [
   AC_DEFINE([HAVE_CSWP], [1], [Define if CSWP support is enabled])
-fi
+  # Check if a path was specified
+  AS_IF([test "x$enable_cswp" != "xyes"], [
+    AS_IF([test ! -d "$enable_cswp"], [
+      AC_MSG_ERROR([Argument '$enable_cswp' specified to --enable-cswp is not a valid directory])
+    ])
+    CSWP_CFLAGS="-I$enable_cswp/include"
+    AC_SUBST(CSWP_CFLAGS)
+    CSWP_SO_LIBS="$enable_cswp/lib/libcdebug_client.so $enable_cswp/lib/libcstrace_client.so"
+    AC_SUBST(CSWP_SO_LIBS)
+  ])
+])
 
 AC_ARG_ENABLE([amtjtagaccel],
   AS_HELP_STRING([--enable-amtjtagaccel], [Enable building the Amontec JTAG-Accelerator driver]),
@@ -971,8 +981,7 @@ m4_foreach([adapter], [USB1_ADAPTERS,
 	LIBFTDI_USB1_ADAPTERS,
 	LIBGPIOD_ADAPTERS,
 	LIBJAYLINK_ADAPTERS, PCIE_ADAPTERS, SERIAL_PORT_ADAPTERS,
-	OPTIONAL_LIBRARIES,
-	[[cswp], [Coresight Wire Protocol support], [CSWP]]
+	OPTIONAL_LIBRARIES
 	],
 	[s=m4_format(["%-40s"], ADAPTER_DESC([adapter]))
 	AS_CASE([$ADAPTER_VAR([adapter])],
@@ -986,4 +995,16 @@ m4_foreach([adapter], [USB1_ADAPTERS,
 			echo "$s"no
 	])
 ])
+s=m4_format(["%-40s"], Coresight Wire Protocol support)
+AS_CASE([$enable_cswp],
+	[no], [
+		echo "$s"no
+	],
+	[yes], [
+		echo "$s"yes
+	],
+	[
+		echo "$s"yes "($enable_cswp)"
+	]
+)
 echo

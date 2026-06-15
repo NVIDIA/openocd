@@ -8,4 +8,7 @@ noinst_LTLIBRARIES += %D%/libcswp.la
 	%D%/cswp.h
 
 # Add CSWP include directory to search path
-%C%_libcswp_la_CPPFLAGS = $(AM_CPPFLAGS) -I$(srcdir)/%D% 
+%C%_libcswp_la_CPPFLAGS = $(AM_CPPFLAGS) -I$(srcdir)/%D% $(CSWP_CFLAGS)
+
+contrib_cswpdir="$(pkgdatadir)/contrib/cswp"
+contrib_cswp_DATA=$(CSWP_SO_LIBS)
