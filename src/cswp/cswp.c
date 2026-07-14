@@ -372,9 +372,20 @@ cswp_enable(cswp_conn_t* conn) {
 														&serverVersion);
 	}
 	if (retval != CSWP_SUCCESS) {
-		LOG_ERROR("Failed to connect and start CSWP server. Error: %s (%d)",
-							conn->api.decode_error(conn, retval), retval);
-		return ERROR_FAIL;
+		LOG_ERROR("Failed to connect and start CSWP server:");
+		// Try to guess what the problem might be based on error codes
+		switch ((cswp_result_t)retval) {
+			case CSWP_TIMEOUT:
+				LOG_ERROR("The server did not respond, verify that it is unlocked.");
+				break;
+			case CSWP_TXFAILED:
+				LOG_ERROR("The server did not respond, check that it is enabled and running.");
+				break;
+			default:
+				LOG_ERROR("%s (%d).",	conn->api.decode_error(conn->client, retval),
+									retval);
+			}
+			return ERROR_FAIL;
 	}
 	LOG_INFO("CSWP server has started. Server Protocol Version is [0x%" PRIx64
 						"], Server ID is [%s] and Server Version is [0x%x]",
@@ -927,6 +938,10 @@ cswp_mem_ap_write(cswp_conn_t* conn, uint64_t devID, uint64_t address,
 		req_info.total_bytes	= bytes_asked;
 		req_info.num_subreqs	= 0;
 		req_info.flags				= incr ? 0 : CSWP_MEM_NO_ADDR_INC;
+		if (bytes_asked > sizeof(req_info.rw_values)) {
+			LOG_ERROR("CSWP write request is too large.");
+			return ERROR_FAIL;
+		}
 		/* Copy the write data to the input buffer */
 		for (size_t i = 0; i < bytes_asked; i++)
 			req_info.rw_values[i] = buf[i];
@@ -1033,7 +1048,7 @@ cswp_create_connection(const char* name) {
 	entry->conn = conn;
 	list_add_tail(&entry->list, &cswp_connections);
 
-	LOG_INFO("Created CSWP connection '%s.'", name);
+	LOG_INFO("Created CSWP connection '%s'.", name);
 	return conn;
 }
 
@@ -1378,8 +1393,7 @@ static int cswp_init(struct command_context *cmd_ctx)
 		/* Enable CSWP and open all devices */
 		retval = cswp_enable(conn);
 		if (retval != ERROR_OK) {
-			LOG_ERROR("Failed to enable CSWP connection %s, check permissions and"
-								" that CSWP is enabled on this system.", entry->name);
+			LOG_ERROR("Failed to enable CSWP connection %s.", entry->name);
 			return retval;
 		}
 		LOG_INFO("CSWP connection %s using %s %s successfully enabled",
