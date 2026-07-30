@@ -654,12 +654,12 @@ static int jtagdp_transaction_endcheck(struct adiv5_dap *dap)
 		if (!dap->ignore_syspwrupack)
 			pwrmask |= CSYSPWRUPACK;
 		if ((ctrlstat & pwrmask) != pwrmask) {
-			LOG_ERROR("Debug regions are unpowered, an unexpected reset might have happened");
+			LOG_WARNING("Debug regions are unpowered, an unexpected reset might have happened");
 			dap->do_reconnect = true;
 		}
 
 		if (ctrlstat & SSTICKYERR)
-			LOG_ERROR("JTAG-DP STICKY ERROR");
+			LOG_DEBUG("JTAG-DP STICKY ERROR");
 		if (ctrlstat & SSTICKYORUN)
 			LOG_DEBUG("JTAG-DP STICKY OVERRUN");
 

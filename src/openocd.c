@@ -156,8 +156,12 @@ COMMAND_HANDLER(handle_init_command)
 		return ERROR_FAIL;
 
 	LOG_DEBUG("Examining targets...");
-	if (target_examine() != ERROR_OK)
+	if (target_examine() != ERROR_OK) {
 		LOG_DEBUG("target examination failed");
+		/* If a shutdown is pending we stop here to avoid further errors */
+		if (openocd_is_shutdown_pending())
+			return ERROR_FAIL;
+	}
 
 	command_context_mode(CMD_CTX, COMMAND_CONFIG);
 
@@ -176,6 +180,10 @@ COMMAND_HANDLER(handle_init_command)
 		return ERROR_FAIL;
 
 	jtag_poll_unmask(save_poll_mask);
+
+	/* If a shutdown is pending we stop here */
+	if (openocd_is_shutdown_pending())
+		return ERROR_FAIL;
 
 	/* initialize telnet subsystem */
 	gdb_target_add_all(all_targets);

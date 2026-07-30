@@ -858,6 +858,10 @@ int target_examine(void)
 	struct target *target, *next_target;
 
 	for (target = all_targets; target; target = next_target) {
+		/* Check for a shutdown request, in which case we bail out as this can
+		   take a VERY long time. */
+		if (openocd_is_shutdown_pending())
+			return ERROR_FAIL;
 		/* Save this value here in case target gets freed */
 		next_target = target->next;
 		if(target->has_tap) {
@@ -1693,6 +1697,10 @@ static int target_init(struct command_context *cmd_ctx)
 		retval = target_init_one(cmd_ctx, target);
 		if (retval != ERROR_OK)
 			return retval;
+		/* Check for a shutdown request, in which case we bail out as this can
+		   take a VERY long time. */
+		if (openocd_is_shutdown_pending())
+			return ERROR_FAIL;
 	}
 
 	if (!all_targets)
