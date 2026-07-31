@@ -340,9 +340,6 @@ static int aarch64_prepare_halt_smp(struct target *target, bool exc_target, stru
 		if (curr->state != TARGET_RUNNING)
 			continue;
 
-		/* HACK: mark this target as prepared for halting */
-		curr->debug_reason = DBG_REASON_DBGRQ;
-
 		/* open the gate for channel 0 to let HALT requests pass to the CTM */
 		retval = arm_cti_ungate_channel(armv8->cti, 0);
 		if (retval == ERROR_OK)
@@ -390,6 +387,8 @@ static int aarch64_halt_one(struct target *target, enum halt_mode mode)
 				LOG_ERROR("Timeout waiting for target %s halt", target_name(target));
 			return retval;
 		}
+		/* Target was stopped by CTI event */
+		target->debug_reason = DBG_REASON_DBGRQ;
 	}
 
 	return ERROR_OK;
@@ -419,6 +418,7 @@ static int aarch64_halt_smp(struct target *target, bool exc_target)
 		bool all_halted = true;
 		struct target_list *head;
 		struct target *curr;
+		struct target *first_not_halted;
 
 		foreach_smp_target(head, target->smp_targets) {
 			int halted;
@@ -436,8 +436,16 @@ static int aarch64_halt_smp(struct target *target, bool exc_target)
 					aarch64_enable_reset_catch(curr, true);
 				} else {
 					all_halted = false;
-					break;
+					first_not_halted = curr;
 				}
+				continue;
+			}
+			if ((curr->debug_reason != DBG_REASON_DBGRQ)
+					&& (!exc_target || (curr != target))) {
+				/* Target was stopped by CTI event */
+				curr->debug_reason = DBG_REASON_DBGRQ;
+				/* Reset timeout since we found a freshly updated thread */
+				then = timeval_ms();
 			}
 		}
 
@@ -445,6 +453,8 @@ static int aarch64_halt_smp(struct target *target, bool exc_target)
 			break;
 
 		if (timeval_ms() > then + 1000) {
+			LOG_INFO("Timeout waiting for %s SMP targets to stop.",
+								target_name(target));
 			retval = ERROR_TARGET_TIMEOUT;
 			break;
 		}
@@ -456,7 +466,7 @@ static int aarch64_halt_smp(struct target *target, bool exc_target)
 		 * cluster explicitly. So if we find that a core has not halted
 		 * yet, we trigger an explicit halt for the second cluster.
 		 */
-		retval = aarch64_halt_one(curr, HALT_LAZY);
+		retval = aarch64_halt_one(first_not_halted, HALT_LAZY);
 		if (retval != ERROR_OK)
 			break;
 	}
@@ -703,7 +713,7 @@ static int aarch64_do_restart_one(struct target *target, enum restart_mode mode)
 				break;
 
 			if (timeval_ms() > then + 1000) {
-				LOG_ERROR("%s: Timeout waiting for resume"PRIx32, target_name(target));
+				LOG_ERROR("%s: Timeout waiting for resume", target_name(target));
 				retval = ERROR_TARGET_TIMEOUT;
 				break;
 			}
@@ -801,6 +811,7 @@ static int aarch64_step_restart_smp(struct target *target)
 	int64_t then = timeval_ms();
 	for (;;) {
 		struct target *curr = target;
+		struct target *first_not_resumed;
 		bool all_resumed = true;
 
 		foreach_smp_target(head, target->smp_targets) {
@@ -809,7 +820,7 @@ static int aarch64_step_restart_smp(struct target *target)
 
 			curr = head->target;
 
-			if (curr == target)
+			if (curr == first)
 				continue;
 
 			if (!target_was_examined(curr))
@@ -819,7 +830,8 @@ static int aarch64_step_restart_smp(struct target *target)
 					PRSR_SDR, PRSR_SDR, &resumed, &prsr);
 			if (retval != ERROR_OK || (!resumed && (prsr & PRSR_HALT))) {
 				all_resumed = false;
-				break;
+				first_not_resumed = curr;
+				continue;
 			}
 
 			if (curr->state != TARGET_RUNNING) {
@@ -844,10 +856,10 @@ static int aarch64_step_restart_smp(struct target *target)
 		 * cluster explicitly. So if we find that a core has not halted
 		 * yet, we trigger an explicit resume for the second cluster.
 		 */
-		retval = aarch64_do_restart_one(curr, RESTART_LAZY);
+		retval = aarch64_do_restart_one(first_not_resumed, RESTART_LAZY);
 		if (retval != ERROR_OK)
 			break;
-}
+	}
 
 	return retval;
 }
@@ -897,7 +909,7 @@ static int aarch64_resume(struct target *target, int current,
 			return retval;
 	}
 
-	retval = aarch64_restart_one(target, RESTART_SYNC);
+	retval = aarch64_restart_one(target, target->smp ? RESTART_LAZY : RESTART_SYNC);
 	if (retval != ERROR_OK)
 		return retval;
 
@@ -905,6 +917,7 @@ static int aarch64_resume(struct target *target, int current,
 		int64_t then = timeval_ms();
 		for (;;) {
 			struct target *curr = target;
+			struct target *first_not_resumed;
 			struct target_list *head;
 			bool all_resumed = true;
 
@@ -913,8 +926,7 @@ static int aarch64_resume(struct target *target, int current,
 				int resumed;
 
 				curr = head->target;
-				if (curr == target)
-					continue;
+
 				if (!target_was_examined(curr))
 					continue;
 
@@ -922,7 +934,8 @@ static int aarch64_resume(struct target *target, int current,
 						PRSR_SDR, PRSR_SDR, &resumed, &prsr);
 				if (retval != ERROR_OK || (!resumed && (prsr & PRSR_HALT))) {
 					all_resumed = false;
-					break;
+					first_not_resumed = curr;
+					continue;
 				}
 
 				if (curr->state != TARGET_RUNNING) {
@@ -948,7 +961,7 @@ static int aarch64_resume(struct target *target, int current,
 			 * cluster explicitly. So if we find that a core has not halted
 			 * yet, we trigger an explicit resume for the second cluster.
 			 */
-			retval = aarch64_do_restart_one(curr, RESTART_LAZY);
+			retval = aarch64_do_restart_one(first_not_resumed, RESTART_LAZY);
 			if (retval != ERROR_OK)
 				break;
 		}
@@ -2777,7 +2790,10 @@ static int aarch64_examine_first(struct target *target)
 	armv8->arm.core_state = ARM_STATE_AARCH64;
 
 	target->state = TARGET_UNKNOWN;
-	target->debug_reason = DBG_REASON_NOTHALTED;
+	/* Set debug reason to NOTHALTED if system is running because it won't
+	   be updated again until next time we stop. */
+	target->debug_reason = prsr & PRSR_HALT ? DBG_REASON_UNDEFINED :
+																						DBG_REASON_NOTHALTED;
 	aarch64->isrmasking_mode = AARCH64_ISRMASK_ON;
 	target_set_examined(target);
 	return ERROR_OK;

@@ -8609,6 +8609,14 @@ Redirect logging to @var{filename} or set it back to default output;
 the default log output channel is stderr.
 @end deffn
 
+@deffn {Command} {remotetimeout} [milliseconds]
+Display the maximum interval allowed between calls to OpenOCD's
+@code{keep_alive()} function. If @var{milliseconds} is provided, set the
+interval to that value. The minimum is 500 milliseconds and the default is
+1000 milliseconds. This setting is local to OpenOCD and does not change GDB's
+@command{set remotetimeout} setting.
+@end deffn
+
 @deffn {Command} {add_script_search_dir} [directory]
 Add @var{directory} to the file/script search path.
 @end deffn

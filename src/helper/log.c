@@ -246,6 +246,8 @@ COMMAND_HANDLER(handle_log_output_command)
 	return ERROR_COMMAND_SYNTAX_ERROR;
 }
 
+COMMAND_HANDLER(handle_remotetimeout_command);
+
 static const struct command_registration log_command_handlers[] = {
 	{
 		.name = "log_output",
@@ -263,6 +265,13 @@ static const struct command_registration log_command_handlers[] = {
 			"2 (default) adds other info; 3 adds debugging; "
 			"4 adds extra verbose debugging.",
 		.usage = "number",
+	},
+	{
+		.name = "remotetimeout",
+		.handler = handle_remotetimeout_command,
+		.mode = COMMAND_ANY,
+		.help = "set the maximum interval between keep_alive() calls",
+		.usage = "[milliseconds]",
 	},
 	COMMAND_REGISTRATION_DONE
 };
@@ -379,8 +388,8 @@ char *alloc_printf(const char *format, ...)
 	return string;
 }
 
-/* Code must return to the server loop before 1000ms has returned or invoke
- * this function.
+/* Code must return to the server loop before the keep-alive timeout has
+ * elapsed or invoke this function.
  *
  * The GDB connection will time out if it spends >2000ms and you'll get nasty
  * error messages from GDB:
@@ -400,9 +409,31 @@ char *alloc_printf(const char *format, ...)
  * fast when invoked more often than every 500ms.
  *
  */
-#define KEEP_ALIVE_KICK_TIME_MS  500
-#define KEEP_ALIVE_TIMEOUT_MS   1000
-#define KEEP_ALIVE_HELLO_MS   600000
+#define KEEP_ALIVE_KICK_TIME_MS        500
+#define KEEP_ALIVE_TIMEOUT_DEFAULT_MS 1000
+#define KEEP_ALIVE_HELLO_MS         600000
+
+static uint32_t keep_alive_timeout_ms = KEEP_ALIVE_TIMEOUT_DEFAULT_MS;
+
+COMMAND_HANDLER(handle_remotetimeout_command)
+{
+	if (CMD_ARGC == 1) {
+		uint32_t timeout_ms;
+		COMMAND_PARSE_NUMBER(u32, CMD_ARGV[0], timeout_ms);
+		if (timeout_ms < KEEP_ALIVE_KICK_TIME_MS) {
+			LOG_ERROR("remotetimeout must be at least %d ms",
+				KEEP_ALIVE_KICK_TIME_MS);
+			return ERROR_COMMAND_ARGUMENT_INVALID;
+		}
+		keep_alive_timeout_ms = timeout_ms;
+	} else if (CMD_ARGC > 1) {
+		return ERROR_COMMAND_SYNTAX_ERROR;
+	}
+
+	command_print(CMD, "remotetimeout: %" PRIu32 " ms", keep_alive_timeout_ms);
+
+	return ERROR_OK;
+}
 
 static void gdb_timeout_warning(int64_t delta_time)
 {
@@ -410,16 +441,17 @@ static void gdb_timeout_warning(int64_t delta_time)
 
 	if (gdb_actual_connections)
 		LOG_WARNING("keep_alive() was not invoked in the "
-			"%d ms timelimit. GDB alive packet not "
+			"%" PRIu32 " ms timelimit. GDB alive packet not "
 			"sent! (%" PRId64 " ms). Workaround: increase "
-			"\"set remotetimeout\" in GDB",
-			KEEP_ALIVE_TIMEOUT_MS,
+			"\"set remotetimeout\" in GDB and adjust OpenOCD's \"remotetimeout\" "
+			"option accordingly.",
+			keep_alive_timeout_ms,
 			delta_time);
 	else
 		LOG_DEBUG("keep_alive() was not invoked in the "
-			"%d ms timelimit (%" PRId64 " ms). This may cause "
+			"%" PRIu32 " ms timelimit (%" PRId64 " ms). This may cause "
 			"trouble with GDB connections.",
-			KEEP_ALIVE_TIMEOUT_MS,
+			keep_alive_timeout_ms,
 			delta_time);
 }
 
@@ -429,7 +461,7 @@ void keep_alive(void)
 	int64_t delta_time = current_time - last_time;
 	int64_t delta_hello_time = current_time - last_hello_time;
 
-	if (delta_time > KEEP_ALIVE_TIMEOUT_MS) {
+	if (delta_time > keep_alive_timeout_ms) {
 		last_time = current_time;
 
 		gdb_timeout_warning(delta_time);
@@ -470,7 +502,7 @@ void kept_alive(void)
 
 	last_time = current_time;
 
-	if (delta_time > KEEP_ALIVE_TIMEOUT_MS)
+	if (delta_time > keep_alive_timeout_ms)
 		gdb_timeout_warning(delta_time);
 }
 

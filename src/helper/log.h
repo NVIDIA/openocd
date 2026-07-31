@@ -30,12 +30,16 @@
  *                  feeble ersatz.
  * LOG_LVL_USER - user messages. Could be anything from information
  *                to progress messages. These messages do not represent
- *                incorrect or unexpected behaviour, just normal execution.
+ *                incorrect or unexpected behaviour, just normal execution
+ *                and are relayed to a debugger.
  * LOG_LVL_ERROR - fatal errors, that are likely to cause program abort
  * LOG_LVL_WARNING - non-fatal errors, that may be resolved later
  * LOG_LVL_INFO - state information, etc.
  * LOG_LVL_DEBUG - debug statements, execution trace
  * LOG_LVL_DEBUG_IO - verbose debug, low-level I/O trace
+ *
+ * LOG_LVL_WARNING and lower are relayed to gdb, others are not (thus USER is
+ * but not INFO).
  */
 enum log_levels {
 	LOG_LVL_SILENT = -3,

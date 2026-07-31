@@ -273,11 +273,9 @@ static int hwthread_get_thread_reg_list(struct rtos *rtos, int64_t thread_id,
 		if (!reg_list[i]->valid) {
 			retval = reg_list[i]->type->get(reg_list[i]);
 			if (retval != ERROR_OK) {
-				LOG_ERROR("Couldn't get register %s for target %s.", reg_list[i]->name,
-									target_name(target));
-				free(reg_list);
-				free(*rtos_reg_list);
-				return retval;
+				LOG_WARNING("Couldn't get register %s for target %s.", reg_list[i]->name,
+									target_name(curr));
+				memset(reg_list[i]->value, 0, DIV_ROUND_UP(reg_list[i]->size, 8));
 			}
 		}
 		(*rtos_reg_list)[j].number = reg_list[i]->number;

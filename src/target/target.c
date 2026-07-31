@@ -3157,7 +3157,7 @@ int handle_target(void *priv)
 		   using all processing power, limit how much is processed on
 		   each call to handle_target(). */
 		if ((current_time - start_time) > TARGET_DEFAULT_POLLING_INTERVAL/2) {
-			LOG_DEBUG("Yielding to other tasks after %d iterations.", iterations);
+			LOG_DEBUG_IO("Yielding to other tasks after %d iterations.", iterations);
 			break;
 		}
 
